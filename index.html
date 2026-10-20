@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tarjeta de Sellos</title>
+    <meta name="description"
+        content="Tarjeta digital de sellos. Acumula 10 sellos con tus compras y obtén una recompensa increíble.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <!-- Decorative background elements -->
+    <div class="bg-decoration">
+        <div class="bg-circle bg-circle-1"></div>
+        <div class="bg-circle bg-circle-2"></div>
+        <div class="bg-circle bg-circle-3"></div>
+    </div>
+
+    <div class="app-container">
+
+        <!-- ============================== -->
+        <!-- AUTH SCREEN (Login / Register)  -->
+        <!-- ============================== -->
+        <section class="screen auth-screen" id="authScreen">
+            <header class="auth-header">
+                <div class="auth-logo-icon">
+                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="24" cy="24" r="21" stroke="currentColor" stroke-width="2.5"
+                            stroke-dasharray="5 4" />
+                        <path d="M24 12L27 20H35L29 25L31 33L24 28L17 33L19 25L13 20H21L24 12Z"
+                            fill="currentColor" />
+                    </svg>
+                </div>
+                <h1 class="auth-title">Tarjeta de Sellos</h1>
+                <p class="auth-subtitle">Inicia sesión o crea tu cuenta</p>
+            </header>
+
+            <!-- Auth Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLogin" onclick="showAuthTab('login')">Iniciar Sesión</button>
+                <button class="auth-tab" id="tabRegister" onclick="showAuthTab('register')">Crear Cuenta</button>
+            </div>
+
+            <!-- Error Message -->
+            <div class="auth-error" id="authError"></div>
+
+            <!-- LOGIN FORM -->
+            <div class="auth-form-container active" id="loginFormContainer">
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginEmail" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <rect x="2" y="4" width="20" height="16" rx="3"/>
+                                <path d="M22 7L13.03 12.7c-.64.4-1.42.4-2.06 0L2 7"/>
+                            </svg>
+                            Correo electrónico
+                        </label>
+                        <input type="email" id="loginEmail" class="form-input" placeholder="tu@correo.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                            Contraseña
+                        </label>
+                        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="auth-submit-btn" id="loginSubmitBtn">
+                        <span class="btn-text">Iniciar Sesión</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" width="18" height="18">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </form>
+                <p class="auth-switch-text">
+                    ¿No tienes cuenta?
+                    <button class="auth-switch-link" onclick="showAuthTab('register')">Regístrate aquí</button>
+                </p>
+            </div>
+
+            <!-- REGISTER FORM -->
+            <div class="auth-form-container" id="registerFormContainer">
+                <form id="registerForm" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label for="registerName" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            Nombre completo
+                        </label>
+                        <input type="text" id="registerName" class="form-input" placeholder="Tu nombre" autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <rect x="2" y="4" width="20" height="16" rx="3"/>
+                                <path d="M22 7L13.03 12.7c-.64.4-1.42.4-2.06 0L2 7"/>
+                            </svg>
+                            Correo electrónico
+                        </label>
+                        <input type="email" id="registerEmail" class="form-input" placeholder="tu@correo.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                            Contraseña
+                        </label>
+                        <input type="password" id="registerPassword" class="form-input" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                    </div>
+
+                    <!-- Role Selection -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            ¿Cuál es tu rol?
+                        </label>
+                        <div class="role-selector">
+                            <label class="role-option" id="roleOptionSeller">
+                                <input type="radio" name="registerRole" value="seller" class="role-radio">
+                                <div class="role-option-content">
+                                    <div class="role-option-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                                            <path d="M12 2L15 8.5H22L16.5 13L18.5 20L12 15.5L5.5 20L7.5 13L2 8.5H9L12 2Z" />
+                                        </svg>
+                                    </div>
+                                    <div class="role-option-text">
+                                        <span class="role-option-title">Vendedor</span>
+                                        <span class="role-option-desc">Gestiona sellos de clientes</span>
+                                    </div>
+                                    <div class="role-check">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="16" height="16">
+                                            <path d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="role-option" id="roleOptionClient">
+                                <input type="radio" name="registerRole" value="client" class="role-radio">
+                                <div class="role-option-content">
+                                    <div class="role-option-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                    </div>
+                                    <div class="role-option-text">
+                                        <span class="role-option-title">Cliente</span>
+                                        <span class="role-option-desc">Consulta tus sellos</span>
+                                    </div>
+                                    <div class="role-check">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="16" height="16">
+                                            <path d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="auth-submit-btn" id="registerSubmitBtn">
+                        <span class="btn-text">Crear Cuenta</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" width="18" height="18">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </form>
+                <p class="auth-switch-text">
+                    ¿Ya tienes cuenta?
+                    <button class="auth-switch-link" onclick="showAuthTab('login')">Inicia sesión</button>
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <footer class="app-footer">
+                <p>G3</p>
+            </footer>
+        </section>
+
+        <!-- ============================== -->
+        <!-- SELLER PANEL                   -->
+        <!-- ============================== -->
+        <section class="screen seller-screen" id="sellerScreen">
+            <header class="app-header">
+                <div class="header-row">
+                    <div class="logo-area">
+                        <div class="logo-text">
+                            <h1>Tarjeta de Sellos</h1>
+                            <p class="tagline">Panel del Vendedor</p>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="user-info">
+                            <div class="user-avatar" id="sellerAvatar">V</div>
+                            <span class="user-display-name" id="sellerName">Vendedor</span>
+                        </div>
+                        <button class="logout-btn" onclick="handleLogout()" aria-label="Cerrar sesión" title="Cerrar sesión">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" width="18" height="18">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <div class="stamp-card" id="stampCard">
+                    <!-- Card Header -->
+                    <div class="card-header">
+                        <div class="card-title-area">
+                            <h2 class="card-title">Tarjeta de Sellos</h2>
+                            <span class="card-badge" id="stampCount">0 / 10</span>
+                        </div>
+                        <p class="card-subtitle">Toca una casilla para marcar o desmarcar un sello</p>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-labels">
+                            <span>Inicio</span>
+                            <span id="progressText">0% completado</span>
+                            <span>Premio</span>
+                        </div>
+                    </div>
+
+                    <!-- Stamps Grid -->
+                    <div class="stamps-grid" id="stampsGrid">
+                        <!-- Stamps will be generated by JS -->
+                    </div>
+                </div>
+
+                <!-- Reward Modal (hidden by default) -->
+                <div class="reward-overlay" id="rewardOverlay">
+                    <div class="reward-modal" id="rewardModal">
+                        <div class="confetti-container" id="confettiContainer"></div>
+                        <div class="reward-content">
+                            <div class="reward-icon-wrapper">
+                                <div class="reward-icon">🎉</div>
+                            </div>
+                            <h2 class="reward-title">¡Tarjeta Completa!</h2>
+                            <p class="reward-subtitle">Tu cliente ha completado sus 10 sellos</p>
+                            <div class="reward-badge">
+                                <span class="reward-badge-icon">🎁</span>
+                                <span class="reward-badge-text">Dile a tu cliente que ganó su recompensa</span>
+                            </div>
+                            <p class="reward-description">El cliente ha completado su tarjeta. Entrégale su premio y
+                                reinicia la tarjeta para comenzar de nuevo.
+                            </p>
+                            <div class="reward-actions">
+                                <button class="reward-claim-btn" onclick="claimReward()">
+                                    <span>Premio Entregado — Reiniciar Tarjeta</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round" width="20" height="20">
+                                        <path d="M5 12h14M12 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                                <button class="reward-close-btn" onclick="closeReward()">Cerrar sin reiniciar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="app-footer">
+                <p>G3</p>
+            </footer>
+        </section>
+
+        <!-- ============================== -->
+        <!-- CLIENT PANEL (Read-only)       -->
+        <!-- ============================== -->
+        <section class="screen client-screen" id="clientScreen">
+            <header class="app-header">
+                <div class="header-row">
+                    <div class="logo-area">
+                        <div class="logo-text">
+                            <h1>Mis Sellos</h1>
+                            <p class="tagline">Panel del Cliente</p>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="user-info">
+                            <div class="user-avatar user-avatar--client" id="clientAvatar">C</div>
+                            <span class="user-display-name" id="clientName">Cliente</span>
+                        </div>
+                        <button class="logout-btn" onclick="handleLogout()" aria-label="Cerrar sesión" title="Cerrar sesión">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" width="18" height="18">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <!-- Client Summary Card -->
+                <div class="client-summary" id="clientSummary">
+                    <div class="client-summary-info">
+                        <h2 class="client-summary-title" id="clientSummaryTitle">¡Sigue acumulando!</h2>
+                    </div>
+                </div>
+
+                <!-- Client Stamp Card (read-only) -->
+                <div class="stamp-card client-card" id="clientStampCard">
+                    <div class="card-header">
+                        <div class="card-title-area">
+                            <h2 class="card-title">Tu Tarjeta</h2>
+                            <span class="card-badge" id="clientStampCount">0 / 10</span>
+                        </div>
+                        <p class="card-subtitle">Tu progreso hacia la recompensa</p>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="clientProgressFill"></div>
+                        </div>
+                        <div class="progress-labels">
+                            <span>Inicio</span>
+                            <span id="clientProgressText">0% completado</span>
+                            <span>Premio 🎁</span>
+                        </div>
+                    </div>
+
+                    <!-- Stamps Grid (read-only) -->
+                    <div class="stamps-grid" id="clientStampsGrid">
+                        <!-- Read-only stamps will be generated by JS -->
+                    </div>
+                </div>
+
+                <!-- Client Reward Message (shown when card is complete) -->
+                <div class="client-reward-banner" id="clientRewardBanner">
+                    <div class="client-reward-banner-icon">🎉</div>
+                    <h3 class="client-reward-banner-title">¡Felicidades!</h3>
+                    <p class="client-reward-banner-text">Has completado tu tarjeta. Acude con el vendedor para reclamar
+                        tu recompensa.</p>
+                </div>
+            </main>
+
+            <footer class="app-footer">
+                <p>G3</p>
+            </footer>
+        </section>
+
+    </div>
+
+    <!-- Firebase SDK (compat — no bundler needed) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics-compat.js"></script>
+    <script src="firebase.js"></script>
+    <script src="app.js"></script>
+    <script src="auth.js"></script>
+</body>
+
+</html>
