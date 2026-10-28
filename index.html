@@ -215,7 +215,7 @@
                 <div class="header-row">
                     <div class="logo-area">
                         <div class="logo-text">
-                            <h1>Tarjeta de Sellos</h1>
+                            <h1 id="sellerHeaderTitle">Tarjeta de Sellos</h1>
                             <p class="tagline">Panel del Vendedor</p>
                         </div>
                     </div>
@@ -254,6 +254,85 @@
                     <button class="onboarding-btn" onclick="openCardSettingsModal()">Personalizar ahora</button>
                 </div>
 
+                <!-- Seller Clients Bar (Select client & Add client) -->
+                <div class="seller-clients-bar" id="sellerClientsBar">
+                    <div class="clients-selector-group">
+                        <label for="sellerClientSelect" class="clients-selector-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            Cliente:
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="sellerClientSelect" class="seller-client-dropdown" onchange="onSellerClientSelectChange(event)">
+                                <option value="">Selecciona un cliente...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="add-client-btn" onclick="openAddClientModal()" title="Agregar nuevo cliente por correo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Agregar Cliente</span>
+                    </button>
+                </div>
+
+                <!-- Active Client Info Strip -->
+                <div class="active-client-strip" id="activeClientStrip" style="display: none;">
+                    <div class="active-client-info">
+                        <div class="active-client-avatar" id="activeClientAvatar">C</div>
+                        <div class="active-client-details">
+                            <div class="active-client-name-row">
+                                <span class="active-client-name" id="activeClientName">Nombre Cliente</span>
+                                <span class="active-client-stamps-pill" id="activeClientStampsPill">0 / 10 sellos</span>
+                            </div>
+                            <span class="active-client-email" id="activeClientEmail">cliente@correo.com</span>
+                        </div>
+                    </div>
+                    <div class="active-client-actions">
+                        <button class="client-action-btn" onclick="handleResetClientCard()" title="Reiniciar sellos a 0">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            <span>Reiniciar</span>
+                        </button>
+                        <button class="client-action-btn delete" onclick="handleDeleteClientCard()" title="Eliminar cliente de mi lista">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            <span>Eliminar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty state for Seller (when 0 clients added) -->
+                <div class="seller-empty-state" id="sellerEmptyClients" style="display: none;">
+                    <div class="empty-icon-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="46" height="46">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <line x1="19" y1="8" x2="19" y2="14"/>
+                            <line x1="22" y1="11" x2="16" y2="11"/>
+                        </svg>
+                    </div>
+                    <h3 class="empty-title">Aún no tienes clientes en tu panel</h3>
+                    <p class="empty-desc">Para otorgar sellos, agrega a tu cliente ingresando su correo electrónico. La tarjeta se vinculará de inmediato para ambos.</p>
+                    <button class="empty-action-btn" onclick="openAddClientModal()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Agregar Mi Primer Cliente</span>
+                    </button>
+                </div>
+
+                <!-- Stamp Card Area -->
                 <div class="stamp-card" id="stampCard">
                     <!-- Card Header -->
                     <div class="card-header">
@@ -299,7 +378,7 @@
                                 <div class="reward-icon">🎉</div>
                             </div>
                             <h2 class="reward-title">¡Tarjeta Completa!</h2>
-                            <p class="reward-subtitle">Tu cliente ha completado sus 10 sellos</p>
+                            <p class="reward-subtitle" id="rewardSubtitle">Tu cliente ha completado sus 10 sellos</p>
                             <div class="reward-badge">
                                 <span class="reward-badge-icon">🎁</span>
                                 <span class="reward-badge-text">Dile a tu cliente que ganó su recompensa</span>
@@ -357,47 +436,77 @@
             </header>
 
             <main class="main-content">
-                <!-- Client Summary Card -->
-                <div class="client-summary" id="clientSummary">
-                    <div class="client-summary-info">
-                        <h2 class="client-summary-title" id="clientSummaryTitle">¡Sigue acumulando!</h2>
+                <!-- Businesses Tabs (if client is registered in multiple businesses) -->
+                <div class="client-cards-selector" id="clientCardsSelector" style="display: none;">
+                    <div class="client-businesses-tabs" id="clientBusinessesTabs"></div>
+                </div>
+
+                <!-- Client Empty State (When 0 cards linked) -->
+                <div class="client-empty-state" id="clientEmptyCards" style="display: none;">
+                    <div class="empty-icon-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="46" height="46">
+                            <rect x="2" y="4" width="20" height="16" rx="3"/>
+                            <path d="M2 10h20"/>
+                            <circle cx="8" cy="15" r="1.5" fill="currentColor"/>
+                            <circle cx="12" cy="15" r="1.5" fill="currentColor"/>
+                            <circle cx="16" cy="15" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <h3 class="empty-title">Aún no tienes tarjetas de sellos</h3>
+                    <p class="empty-desc">Para que tu tarjeta aparezca aquí, dile al encargado del negocio que te agregue usando tu correo:</p>
+                    <div class="client-email-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <rect x="2" y="4" width="20" height="16" rx="3"/>
+                            <path d="M22 7L13.03 12.7c-.64.4-1.42.4-2.06 0L2 7"/>
+                        </svg>
+                        <span id="clientEmptyEmail">tu@correo.com</span>
                     </div>
                 </div>
 
-                <!-- Client Stamp Card (read-only) -->
-                <div class="stamp-card client-card" id="clientStampCard">
-                    <div class="card-header">
-                        <div class="card-title-area">
-                            <h2 class="card-title" id="clientCardTitle">Tu Tarjeta</h2>
-                            <span class="card-badge" id="clientStampCount">0 / 10</span>
-                        </div>
-                        <p class="card-subtitle" id="clientCardSubtitle">Tu progreso hacia la recompensa</p>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="clientProgressFill"></div>
-                        </div>
-                        <div class="progress-labels">
-                            <span>Inicio</span>
-                            <span id="clientProgressText">0% completado</span>
-                            <span>Premio 🎁</span>
+                <!-- Client Active Card Section -->
+                <div id="clientActiveCardSection">
+                    <!-- Client Summary Card -->
+                    <div class="client-summary" id="clientSummary">
+                        <div class="client-summary-info">
+                            <h2 class="client-summary-title" id="clientSummaryTitle">¡Sigue acumulando!</h2>
                         </div>
                     </div>
 
-                    <!-- Stamps Grid (read-only) -->
-                    <div class="stamps-grid" id="clientStampsGrid">
-                        <!-- Read-only stamps will be generated by JS -->
-                    </div>
-                </div>
+                    <!-- Client Stamp Card (read-only) -->
+                    <div class="stamp-card client-card" id="clientStampCard">
+                        <div class="card-header">
+                            <div class="card-title-area">
+                                <h2 class="card-title" id="clientCardTitle">Tu Tarjeta</h2>
+                                <span class="card-badge" id="clientStampCount">0 / 10</span>
+                            </div>
+                            <p class="card-subtitle" id="clientCardSubtitle">Tu progreso hacia la recompensa</p>
+                        </div>
 
-                <!-- Client Reward Message (shown when card is complete) -->
-                <div class="client-reward-banner" id="clientRewardBanner">
-                    <div class="client-reward-banner-icon">🎉</div>
-                    <h3 class="client-reward-banner-title">¡Felicidades!</h3>
-                    <p class="client-reward-banner-text">Has completado tu tarjeta. Acude con el vendedor para reclamar
-                        tu recompensa.</p>
+                        <!-- Progress Bar -->
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="clientProgressFill"></div>
+                            </div>
+                            <div class="progress-labels">
+                                <span>Inicio</span>
+                                <span id="clientProgressText">0% completado</span>
+                                <span>Premio 🎁</span>
+                            </div>
+                        </div>
+
+                        <!-- Stamps Grid (read-only) -->
+                        <div class="stamps-grid" id="clientStampsGrid">
+                            <!-- Read-only stamps will be generated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Client Reward Message (shown when card is complete) -->
+                    <div class="client-reward-banner" id="clientRewardBanner">
+                        <div class="client-reward-banner-icon">🎉</div>
+                        <h3 class="client-reward-banner-title">¡Felicidades!</h3>
+                        <p class="client-reward-banner-text">Has completado tu tarjeta. Acude con el vendedor para reclamar
+                            tu recompensa.</p>
+                    </div>
                 </div>
             </main>
 
@@ -405,6 +514,68 @@
                 <p>G3</p>
             </footer>
         </section>
+
+        <!-- ============================== -->
+        <!-- ADD CLIENT MODAL               -->
+        <!-- ============================== -->
+        <div class="settings-overlay" id="addClientOverlay">
+            <div class="settings-modal" id="addClientModal">
+                <div class="settings-header">
+                    <div class="settings-title-area">
+                        <div class="settings-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <line x1="19" y1="8" x2="19" y2="14"/>
+                                <line x1="22" y1="11" x2="16" y2="11"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="settings-title">Agregar Cliente</h2>
+                            <p class="settings-subtitle">Crea una tarjeta de sellos para tu cliente</p>
+                        </div>
+                    </div>
+                    <button class="settings-close-btn" onclick="closeAddClientModal()" aria-label="Cerrar modal">&times;</button>
+                </div>
+
+                <form id="addClientForm" onsubmit="handleAddClientSubmit(event)">
+                    <div class="form-group">
+                        <label for="addClientEmail" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <rect x="2" y="4" width="20" height="16" rx="3"/>
+                                <path d="M22 7L13.03 12.7c-.64.4-1.42.4-2.06 0L2 7"/>
+                            </svg>
+                            Correo electrónico del cliente
+                        </label>
+                        <input type="email" id="addClientEmail" class="form-input" placeholder="ejemplo@correo.com" required autocomplete="email">
+                        <span class="form-hint">Tu cliente verá sus sellos vinculados con este correo.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="addClientName" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            Nombre del cliente (opcional)
+                        </label>
+                        <input type="text" id="addClientName" class="form-input" placeholder="Ej: María Gómez" autocomplete="name">
+                    </div>
+
+                    <div class="settings-feedback" id="addClientFeedback"></div>
+
+                    <div class="settings-actions">
+                        <button type="button" class="settings-cancel-btn" onclick="closeAddClientModal()">Cancelar</button>
+                        <button type="submit" class="settings-save-btn" id="addClientSubmitBtn">
+                            <span class="btn-text">Crear Tarjeta</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+                                <path d="M5 12h14M12 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- ============================== -->
         <!-- CARD SETTINGS MODAL            -->

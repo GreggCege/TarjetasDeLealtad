@@ -19,98 +19,227 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // ===================================
-// FIRESTORE — STAMP CARD HELPERS
+// FIRESTORE — MULTI-CLIENT STAMP CARDS
 // ===================================
 
-const CARD_DOC_REF = db.collection('cards').doc('default');
-
 /**
- * Save stamps array to Firestore
+ * Save stamps array for a specific card document
  */
-async function saveStampsToFirestore(stampsArray) {
+async function saveCardStamps(cardId, stampsArray) {
+    if (!cardId) {
+        console.error('saveCardStamps: Falta cardId');
+        return;
+    }
     try {
-        await CARD_DOC_REF.set({
+        await db.collection('cards').doc(cardId).set({
             stamps: stampsArray,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
     } catch (error) {
-        console.error('Error guardando sellos en Firestore:', error);
+        console.error('Error guardando sellos de la tarjeta:', error);
+        throw error;
     }
 }
 
 /**
- * Load stamps from Firestore (one-time read)
+ * Listen for all cards created by a specific seller
  */
-async function loadStampsFromFirestore(totalStamps) {
+function subscribeToSellerCards(sellerId, callback) {
+    if (!sellerId) return () => {};
+    return db.collection('cards')
+        .where('sellerId', '==', sellerId)
+        .onSnapshot((snapshot) => {
+            const cards = [];
+            snapshot.forEach(doc => {
+                cards.push({ id: doc.id, ...doc.data() });
+            });
+            callback(cards);
+        }, (error) => {
+            console.error('Error escuchando tarjetas del vendedor:', error);
+        });
+}
+
+/**
+ * Listen for all cards belonging to a specific client email
+ */
+function subscribeToClientCards(clientEmail, callback) {
+    if (!clientEmail) return () => {};
+    const cleanEmail = clientEmail.toLowerCase().trim();
+    return db.collection('cards')
+        .where('clientEmail', '==', cleanEmail)
+        .onSnapshot((snapshot) => {
+            const cards = [];
+            snapshot.forEach(doc => {
+                cards.push({ id: doc.id, ...doc.data() });
+            });
+            callback(cards);
+        }, (error) => {
+            console.error('Error escuchando tarjetas del cliente:', error);
+        });
+}
+
+/**
+ * Add a client card for a seller
+ */
+async function addClientCard({ sellerId, sellerName, businessName, cardColor, clientEmail, clientName }) {
+    if (!sellerId || !clientEmail) {
+        throw new Error('sellerId y clientEmail son requeridos');
+    }
+    const cleanEmail = clientEmail.toLowerCase().trim();
+
     try {
-        const doc = await CARD_DOC_REF.get();
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.stamps && Array.isArray(data.stamps) && data.stamps.length === totalStamps) {
-                return data.stamps;
-            }
+        // 1. Check if this seller already created a card for this client email
+        const existingSnap = await db.collection('cards')
+            .where('sellerId', '==', sellerId)
+            .where('clientEmail', '==', cleanEmail)
+            .get();
+
+        if (!existingSnap.empty) {
+            const existingDoc = existingSnap.docs[0];
+            return {
+                success: false,
+                code: 'ALREADY_EXISTS',
+                message: 'Ya existe una tarjeta para este cliente en tu panel',
+                card: { id: existingDoc.id, ...existingDoc.data() }
+            };
         }
+
+        // 2. Check if client has a registered user account
+        let clientId = null;
+        let finalClientName = clientName ? clientName.trim() : '';
+
+        try {
+            const userSnap = await db.collection('users')
+                .where('email', '==', cleanEmail)
+                .get();
+
+            if (!userSnap.empty) {
+                const clientUserData = userSnap.docs[0].data();
+                clientId = userSnap.docs[0].id;
+                if (!finalClientName && clientUserData.name) {
+                    finalClientName = clientUserData.name;
+                }
+            }
+        } catch (searchErr) {
+            console.warn('Búsqueda de usuario por correo no disponible:', searchErr);
+        }
+
+        if (!finalClientName) {
+            finalClientName = cleanEmail.split('@')[0];
+        }
+
+        // 3. Create card document
+        const newCardRef = db.collection('cards').doc();
+        const cardData = {
+            sellerId: sellerId,
+            sellerName: sellerName || 'Vendedor',
+            businessName: businessName || 'Mi Negocio',
+            cardColor: cardColor || '#ff6f4a',
+            clientId: clientId,
+            clientEmail: cleanEmail,
+            clientName: finalClientName,
+            stamps: new Array(10).fill(false),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await newCardRef.set(cardData);
+
+        return {
+            success: true,
+            card: { id: newCardRef.id, ...cardData }
+        };
+
     } catch (error) {
-        console.error('Error cargando sellos de Firestore:', error);
+        console.error('Error agregando cliente al panel:', error);
+        throw error;
     }
-    return new Array(totalStamps).fill(false);
 }
 
 /**
- * Listen for real-time changes on the stamp card.
- * Returns an unsubscribe function.
+ * Delete a client card
  */
-function onStampsChange(totalStamps, callback) {
-    return CARD_DOC_REF.onSnapshot((doc) => {
-        if (doc.exists) {
-            const data = doc.data();
-            const stamps = (data.stamps && Array.isArray(data.stamps) && data.stamps.length === totalStamps)
-                ? data.stamps
-                : new Array(totalStamps).fill(false);
-            callback(stamps, data);
-        } else {
-            callback(new Array(totalStamps).fill(false), {});
-        }
-    }, (error) => {
-        console.error('Error escuchando cambios en Firestore:', error);
-    });
+async function deleteClientCard(cardId) {
+    if (!cardId) return;
+    try {
+        await db.collection('cards').doc(cardId).delete();
+    } catch (error) {
+        console.error('Error eliminando tarjeta de cliente:', error);
+        throw error;
+    }
+}
+
+/**
+ * Reset client stamps
+ */
+async function resetClientCard(cardId) {
+    if (!cardId) return;
+    try {
+        await db.collection('cards').doc(cardId).set({
+            stamps: new Array(10).fill(false),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    } catch (error) {
+        console.error('Error reiniciando sellos:', error);
+        throw error;
+    }
 }
 
 /**
  * Save business name and card color settings to Firestore
+ * Updates seller profile and all active client cards for this seller
  */
 async function saveCardSettings(settings) {
     try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
         const updateData = {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (settings.businessName !== undefined) updateData.businessName = settings.businessName;
         if (settings.cardColor !== undefined) updateData.cardColor = settings.cardColor;
 
-        await CARD_DOC_REF.set(updateData, { merge: true });
+        // Update seller profile
+        await db.collection('users').doc(currentUser.uid).set(updateData, { merge: true });
 
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-            await db.collection('users').doc(currentUser.uid).set(updateData, { merge: true });
+        // Update all cards belonging to this seller
+        const cardsSnap = await db.collection('cards')
+            .where('sellerId', '==', currentUser.uid)
+            .get();
+
+        if (!cardsSnap.empty) {
+            const batch = db.batch();
+            cardsSnap.forEach(doc => {
+                batch.set(doc.ref, {
+                    businessName: settings.businessName || '',
+                    cardColor: settings.cardColor || '#ff6f4a',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            });
+            await batch.commit();
         }
     } catch (error) {
-        console.error('Error guardando configuración de tarjeta en Firestore:', error);
+        console.error('Error guardando configuración de vendedor:', error);
         throw error;
     }
 }
 
 /**
- * Load card settings (businessName, cardColor)
+ * Load card settings (businessName, cardColor) for current seller
  */
 async function loadCardSettings() {
     try {
-        const doc = await CARD_DOC_REF.get();
-        if (doc.exists) {
-            const data = doc.data();
-            return {
-                businessName: data.businessName || '',
-                cardColor: data.cardColor || '#ff6f4a'
-            };
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+            const userDoc = await db.collection('users').doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const data = userDoc.data();
+                return {
+                    businessName: data.businessName || '',
+                    cardColor: data.cardColor || '#ff6f4a'
+                };
+            }
         }
     } catch (error) {
         console.error('Error cargando ajustes de tarjeta:', error);

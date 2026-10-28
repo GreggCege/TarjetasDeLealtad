@@ -1,10 +1,18 @@
 // ===================================
-// STAMP CARD APP - Seller & Client Logic
+// STAMP CARD APP - Multi-Client Architecture
 // ===================================
 
 const TOTAL_STAMPS = 10;
-let currentStamps = new Array(TOTAL_STAMPS).fill(false);
-let stampsUnsubscribe = null;
+
+// Seller State
+let sellerCards = [];
+let selectedCardId = null;
+let sellerCardsUnsubscribe = null;
+
+// Client State
+let clientCards = [];
+let selectedClientCardId = null;
+let clientCardsUnsubscribe = null;
 
 // Card Customization State
 let currentBusinessName = '';
@@ -72,7 +80,7 @@ function applyCardTheme(colorHex, businessName) {
 
     const palette = generatePalette(currentCardColor);
 
-    // Apply CSS variables to all stamp cards
+    // Apply CSS variables to cards
     const cards = document.querySelectorAll('.stamp-card');
     cards.forEach(card => {
         card.style.setProperty('--card-primary', palette.primary);
@@ -89,29 +97,19 @@ function applyCardTheme(colorHex, businessName) {
     // Update Seller Card Header
     const sellerCardTitle = document.getElementById('sellerCardTitle');
     const sellerCardSubtitle = document.getElementById('sellerCardSubtitle');
+    const sellerHeaderTitle = document.getElementById('sellerHeaderTitle');
+
+    if (sellerHeaderTitle) {
+        sellerHeaderTitle.textContent = currentBusinessName || 'Tarjeta de Sellos';
+    }
     if (sellerCardTitle) {
         sellerCardTitle.textContent = currentBusinessName || 'Tarjeta de Sellos';
     }
     if (sellerCardSubtitle) {
         sellerCardSubtitle.textContent = currentBusinessName
-            ? `Tarjeta de Fidelidad • ${currentBusinessName}`
+            ? `Tarjeta de Lealtad en ${currentBusinessName} • Toca para marcar`
             : 'Toca una casilla para marcar o desmarcar un sello';
     }
-
-    // Update Client Card Header
-    const clientCardTitle = document.getElementById('clientCardTitle');
-    const clientCardSubtitle = document.getElementById('clientCardSubtitle');
-    if (clientCardTitle) {
-        clientCardTitle.textContent = currentBusinessName || 'Tu Tarjeta';
-    }
-    if (clientCardSubtitle) {
-        clientCardSubtitle.textContent = currentBusinessName
-            ? `Tarjeta de Lealtad en ${currentBusinessName}`
-            : 'Tu progreso hacia la recompensa';
-    }
-
-    // Refresh client progress text to include business name if set
-    updateClientProgress();
 }
 
 // ===================================
@@ -119,73 +117,139 @@ function applyCardTheme(colorHex, businessName) {
 // ===================================
 
 async function initSeller(profile) {
-    // Unsubscribe any previous listener
-    if (stampsUnsubscribe) {
-        stampsUnsubscribe();
-        stampsUnsubscribe = null;
+    if (sellerCardsUnsubscribe) {
+        sellerCardsUnsubscribe();
+        sellerCardsUnsubscribe = null;
     }
 
-    // Initial load of card settings
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    // Load seller settings
     const cardSettings = await loadCardSettings();
     currentBusinessName = cardSettings.businessName || profile?.businessName || '';
     currentCardColor = cardSettings.cardColor || profile?.cardColor || '#ff6f4a';
 
     applyCardTheme(currentCardColor, currentBusinessName);
 
-    // Show onboarding banner if seller has not named their business yet
+    // Check onboarding banner
     const banner = document.getElementById('sellerOnboardingBanner');
     if (banner) {
-        if (!currentBusinessName) {
-            banner.style.display = 'flex';
-        } else {
-            banner.style.display = 'none';
-        }
+        banner.style.display = currentBusinessName ? 'none' : 'flex';
     }
 
-    // Initial load stamps from Firestore
-    currentStamps = await loadStampsFromFirestore(TOTAL_STAMPS);
-    renderSellerGrid();
-    updateSellerProgress();
-    checkSellerReward();
+    // Subscribe to seller's cards in real time
+    sellerCardsUnsubscribe = subscribeToSellerCards(currentUser.uid, (cards) => {
+        sellerCards = cards || [];
+        renderSellerClientsDropdown();
 
-    // Listen for real-time changes
-    stampsUnsubscribe = onStampsChange(TOTAL_STAMPS, (newStamps, cardData) => {
-        currentStamps = [...newStamps];
+        const emptyEl = document.getElementById('sellerEmptyClients');
+        const stampCardEl = document.getElementById('stampCard');
+        const activeStrip = document.getElementById('activeClientStrip');
 
-        if (cardData) {
-            let updatedTheme = false;
-            if (cardData.businessName !== undefined && cardData.businessName !== currentBusinessName) {
-                currentBusinessName = cardData.businessName;
-                updatedTheme = true;
+        if (sellerCards.length === 0) {
+            selectedCardId = null;
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (stampCardEl) stampCardEl.style.display = 'none';
+            if (activeStrip) activeStrip.style.display = 'none';
+        } else {
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (stampCardEl) stampCardEl.style.display = 'block';
+            if (activeStrip) activeStrip.style.display = 'flex';
+
+            // If selected card doesn't exist anymore, pick the first one
+            if (!selectedCardId || !sellerCards.some(c => c.id === selectedCardId)) {
+                selectedCardId = sellerCards[0].id;
             }
-            if (cardData.cardColor && cardData.cardColor !== currentCardColor) {
-                currentCardColor = cardData.cardColor;
-                updatedTheme = true;
-            }
-            if (updatedTheme) {
-                applyCardTheme(currentCardColor, currentBusinessName);
-            }
-            if (currentBusinessName && banner) {
-                banner.style.display = 'none';
-            }
+
+            renderActiveSellerCard();
         }
-
-        renderSellerGrid();
-        updateSellerProgress();
-        checkSellerReward();
     });
 
     renderColorPresets();
 }
 
-function renderSellerGrid() {
+function renderSellerClientsDropdown() {
+    const select = document.getElementById('sellerClientSelect');
+    if (!select) return;
+
+    select.innerHTML = '';
+
+    if (sellerCards.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Sin clientes agregados';
+        select.appendChild(opt);
+        return;
+    }
+
+    sellerCards.forEach(card => {
+        const opt = document.createElement('option');
+        opt.value = card.id;
+        const count = (card.stamps || []).filter(Boolean).length;
+        opt.textContent = `${card.clientName || 'Cliente'} (${count}/10) — ${card.clientEmail}`;
+        if (card.id === selectedCardId) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    });
+}
+
+function onSellerClientSelectChange(e) {
+    const newCardId = e.target.value;
+    if (newCardId) {
+        selectedCardId = newCardId;
+        renderActiveSellerCard();
+    }
+}
+
+function getActiveSellerCard() {
+    return sellerCards.find(c => c.id === selectedCardId) || null;
+}
+
+function renderActiveSellerCard() {
+    const card = getActiveSellerCard();
+    if (!card) return;
+
+    // Update active client strip
+    const avatarEl = document.getElementById('activeClientAvatar');
+    const nameEl = document.getElementById('activeClientName');
+    const emailEl = document.getElementById('activeClientEmail');
+    const pillEl = document.getElementById('activeClientStampsPill');
+
+    const displayName = card.clientName || 'Cliente';
+    const initial = displayName.charAt(0).toUpperCase();
+    const stampsCount = (card.stamps || []).filter(Boolean).length;
+
+    if (avatarEl) avatarEl.textContent = initial;
+    if (nameEl) nameEl.textContent = displayName;
+    if (emailEl) emailEl.textContent = card.clientEmail;
+    if (pillEl) {
+        pillEl.textContent = `${stampsCount} / ${TOTAL_STAMPS} sellos`;
+        pillEl.classList.toggle('complete', stampsCount === TOTAL_STAMPS);
+    }
+
+    // Render stamps grid
+    renderSellerGrid(card.stamps || new Array(TOTAL_STAMPS).fill(false));
+    updateSellerProgress(stampsCount);
+
+    // Check reward
+    if (stampsCount === TOTAL_STAMPS) {
+        const overlay = document.getElementById('rewardOverlay');
+        if (overlay && !overlay.classList.contains('visible') && !overlay.dataset.dismissed) {
+            showRewardOverlay(displayName);
+        }
+    }
+}
+
+function renderSellerGrid(stampsArray) {
     const grid = document.getElementById('stampsGrid');
     if (!grid) return;
     grid.innerHTML = '';
 
     for (let i = 0; i < TOTAL_STAMPS; i++) {
         const isLast = i === TOTAL_STAMPS - 1;
-        const isStamped = !!currentStamps[i];
+        const isStamped = !!stampsArray[i];
 
         const slot = document.createElement('div');
         slot.className = `stamp-slot ${isStamped ? 'stamped' : ''} ${isLast ? 'reward-slot' : ''}`;
@@ -203,25 +267,30 @@ function renderSellerGrid() {
 }
 
 async function toggleStamp(index) {
-    // Toggle state
+    const card = getActiveSellerCard();
+    if (!card) return;
+
+    const currentStamps = [...(card.stamps || new Array(TOTAL_STAMPS).fill(false))];
     currentStamps[index] = !currentStamps[index];
 
-    // Optimistic UI update
-    renderSellerGrid();
-    updateSellerProgress();
+    // Optimistic local update
+    card.stamps = currentStamps;
+    renderActiveSellerCard();
 
-    // Check if user just reached full card
     const count = currentStamps.filter(Boolean).length;
     if (count === TOTAL_STAMPS) {
-        showRewardOverlay();
+        showRewardOverlay(card.clientName);
     }
 
     // Persist to Firestore
-    await saveStampsToFirestore(currentStamps);
+    try {
+        await saveCardStamps(card.id, currentStamps);
+    } catch (err) {
+        console.error('Error al guardar sello:', err);
+    }
 }
 
-function updateSellerProgress() {
-    const count = currentStamps.filter(Boolean).length;
+function updateSellerProgress(count) {
     const percentage = Math.round((count / TOTAL_STAMPS) * 100);
 
     const countEl = document.getElementById('stampCount');
@@ -247,32 +316,30 @@ function updateSellerProgress() {
     }
 }
 
-function checkSellerReward() {
-    const count = currentStamps.filter(Boolean).length;
-    if (count === TOTAL_STAMPS) {
-        const overlay = document.getElementById('rewardOverlay');
-        if (overlay && !overlay.classList.contains('visible') && !overlay.dataset.dismissed) {
-            showRewardOverlay();
-        }
-    }
-}
-
-function showRewardOverlay() {
+function showRewardOverlay(clientName) {
     const overlay = document.getElementById('rewardOverlay');
+    const subtitle = document.getElementById('rewardSubtitle');
     if (!overlay) return;
+
+    if (subtitle && clientName) {
+        subtitle.textContent = `${clientName} ha completado sus 10 sellos`;
+    }
+
     delete overlay.dataset.dismissed;
     overlay.classList.add('visible');
     launchConfetti();
 }
 
 async function claimReward() {
-    // Reset stamps array
-    currentStamps = new Array(TOTAL_STAMPS).fill(false);
-    await saveStampsToFirestore(currentStamps);
+    const card = getActiveSellerCard();
+    if (!card) return closeReward();
+
+    const emptyStamps = new Array(TOTAL_STAMPS).fill(false);
+    card.stamps = emptyStamps;
+    await saveCardStamps(card.id, emptyStamps);
 
     closeReward();
-    renderSellerGrid();
-    updateSellerProgress();
+    renderActiveSellerCard();
 }
 
 function closeReward() {
@@ -283,40 +350,299 @@ function closeReward() {
     }
 }
 
+async function handleResetClientCard() {
+    const card = getActiveSellerCard();
+    if (!card) return;
+
+    if (!confirm(`¿Deseas reiniciar los sellos de ${card.clientName || card.clientEmail} a 0?`)) {
+        return;
+    }
+
+    try {
+        await resetClientCard(card.id);
+        card.stamps = new Array(TOTAL_STAMPS).fill(false);
+        renderActiveSellerCard();
+    } catch (err) {
+        alert('Error al reiniciar sellos');
+    }
+}
+
+async function handleDeleteClientCard() {
+    const card = getActiveSellerCard();
+    if (!card) return;
+
+    if (!confirm(`¿Eliminar la tarjeta de ${card.clientName || card.clientEmail}? El cliente ya no la verá en su cuenta.`)) {
+        return;
+    }
+
+    try {
+        await deleteClientCard(card.id);
+        sellerCards = sellerCards.filter(c => c.id !== card.id);
+        selectedCardId = sellerCards.length > 0 ? sellerCards[0].id : null;
+        renderSellerClientsDropdown();
+
+        if (sellerCards.length === 0) {
+            document.getElementById('sellerEmptyClients').style.display = 'block';
+            document.getElementById('stampCard').style.display = 'none';
+            document.getElementById('activeClientStrip').style.display = 'none';
+        } else {
+            renderActiveSellerCard();
+        }
+    } catch (err) {
+        alert('Error al eliminar cliente');
+    }
+}
+
+// ===================================
+// ADD CLIENT MODAL
+// ===================================
+
+function openAddClientModal() {
+    const overlay = document.getElementById('addClientOverlay');
+    const emailInput = document.getElementById('addClientEmail');
+    const nameInput = document.getElementById('addClientName');
+    const feedback = document.getElementById('addClientFeedback');
+
+    if (emailInput) emailInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (feedback) {
+        feedback.textContent = '';
+        feedback.className = 'settings-feedback';
+    }
+
+    if (overlay) {
+        overlay.classList.add('visible');
+        if (emailInput) {
+            setTimeout(() => emailInput.focus(), 150);
+        }
+    }
+}
+
+function closeAddClientModal() {
+    const overlay = document.getElementById('addClientOverlay');
+    if (overlay) overlay.classList.remove('visible');
+}
+
+async function handleAddClientSubmit(e) {
+    e.preventDefault();
+
+    const emailInput = document.getElementById('addClientEmail');
+    const nameInput = document.getElementById('addClientName');
+    const submitBtn = document.getElementById('addClientSubmitBtn');
+    const feedback = document.getElementById('addClientFeedback');
+
+    const email = emailInput ? emailInput.value.trim() : '';
+    const name = nameInput ? nameInput.value.trim() : '';
+
+    if (!email) {
+        if (feedback) {
+            feedback.textContent = 'Ingresa el correo electrónico del cliente';
+            feedback.className = 'settings-feedback error';
+        }
+        return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        const textSpan = submitBtn.querySelector('.btn-text');
+        if (textSpan) textSpan.textContent = 'Creando tarjeta...';
+    }
+
+    try {
+        const result = await addClientCard({
+            sellerId: currentUser.uid,
+            sellerName: currentUser.displayName || 'Vendedor',
+            businessName: currentBusinessName || 'Mi Negocio',
+            cardColor: currentCardColor || '#ff6f4a',
+            clientEmail: email,
+            clientName: name
+        });
+
+        if (!result.success && result.code === 'ALREADY_EXISTS') {
+            if (feedback) {
+                feedback.textContent = result.message;
+                feedback.className = 'settings-feedback error';
+            }
+            selectedCardId = result.card.id;
+            renderSellerClientsDropdown();
+            renderActiveSellerCard();
+            return;
+        }
+
+        selectedCardId = result.card.id;
+
+        if (feedback) {
+            feedback.textContent = '✓ ¡Cliente y tarjeta agregados con éxito!';
+            feedback.className = 'settings-feedback success';
+        }
+
+        setTimeout(() => {
+            closeAddClientModal();
+        }, 600);
+
+    } catch (err) {
+        console.error('Error al agregar cliente:', err);
+        if (feedback) {
+            feedback.textContent = 'Error al agregar cliente. Revisa las reglas de Firestore o la conexión.';
+            feedback.className = 'settings-feedback error';
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            const textSpan = submitBtn.querySelector('.btn-text');
+            if (textSpan) textSpan.textContent = 'Crear Tarjeta';
+        }
+    }
+}
+
 // ===================================
 // CLIENT PANEL LOGIC
 // ===================================
 
 function initClient(profile) {
-    // Unsubscribe any previous listener
-    if (stampsUnsubscribe) {
-        stampsUnsubscribe();
-        stampsUnsubscribe = null;
+    if (clientCardsUnsubscribe) {
+        clientCardsUnsubscribe();
+        clientCardsUnsubscribe = null;
     }
 
-    // Render read-only grid and subscribe
-    stampsUnsubscribe = onStampsChange(TOTAL_STAMPS, (newStamps, cardData) => {
-        currentStamps = [...newStamps];
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) return;
 
-        if (cardData) {
-            if (cardData.businessName !== undefined) currentBusinessName = cardData.businessName;
-            if (cardData.cardColor) currentCardColor = cardData.cardColor;
-            applyCardTheme(currentCardColor, currentBusinessName);
+    const email = currentUser.email;
+
+    clientCardsUnsubscribe = subscribeToClientCards(email, (cards) => {
+        clientCards = cards || [];
+
+        const emptyEl = document.getElementById('clientEmptyCards');
+        const activeSection = document.getElementById('clientActiveCardSection');
+        const selectorEl = document.getElementById('clientCardsSelector');
+        const emptyEmailSpan = document.getElementById('clientEmptyEmail');
+
+        if (emptyEmailSpan) emptyEmailSpan.textContent = email;
+
+        if (clientCards.length === 0) {
+            selectedClientCardId = null;
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (activeSection) activeSection.style.display = 'none';
+            if (selectorEl) selectorEl.style.display = 'none';
+        } else {
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (activeSection) activeSection.style.display = 'block';
+
+            // If selected doesn't exist, pick the first
+            if (!selectedClientCardId || !clientCards.some(c => c.id === selectedClientCardId)) {
+                selectedClientCardId = clientCards[0].id;
+            }
+
+            renderClientBusinessTabs();
+            renderActiveClientCard();
         }
-
-        renderClientGrid();
-        updateClientProgress();
     });
 }
 
-function renderClientGrid() {
+function renderClientBusinessTabs() {
+    const container = document.getElementById('clientCardsSelector');
+    const tabs = document.getElementById('clientBusinessesTabs');
+    if (!container || !tabs) return;
+
+    if (clientCards.length <= 1) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    tabs.innerHTML = '';
+
+    clientCards.forEach(card => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `client-biz-tab ${card.id === selectedClientCardId ? 'active' : ''}`;
+        btn.textContent = card.businessName || 'Negocio';
+        btn.addEventListener('click', () => {
+            selectedClientCardId = card.id;
+            renderClientBusinessTabs();
+            renderActiveClientCard();
+        });
+        tabs.appendChild(btn);
+    });
+}
+
+function getActiveClientCard() {
+    return clientCards.find(c => c.id === selectedClientCardId) || null;
+}
+
+function renderActiveClientCard() {
+    const card = getActiveClientCard();
+    if (!card) return;
+
+    // Apply this business's theme
+    const cardColor = card.cardColor || '#ff6f4a';
+    const businessName = card.businessName || 'Tarjeta de Sellos';
+    const stamps = card.stamps || new Array(TOTAL_STAMPS).fill(false);
+    const count = stamps.filter(Boolean).length;
+    const isComplete = count === TOTAL_STAMPS;
+
+    const palette = generatePalette(cardColor);
+    const clientCardEl = document.getElementById('clientStampCard');
+    if (clientCardEl) {
+        clientCardEl.style.setProperty('--card-primary', palette.primary);
+        clientCardEl.style.setProperty('--card-primary-dark', palette.darker);
+        clientCardEl.style.setProperty('--card-primary-light', palette.lighter);
+        clientCardEl.style.setProperty('--card-primary-gradient', palette.gradient);
+        clientCardEl.style.setProperty('--card-primary-bg-light', palette.bgLight);
+        clientCardEl.style.setProperty('--card-primary-bg-hover', palette.bgHover);
+        clientCardEl.style.setProperty('--card-primary-border', palette.border);
+        clientCardEl.style.setProperty('--card-primary-glow', palette.glow);
+        clientCardEl.style.setProperty('--card-primary-glow-lg', palette.glowLg);
+    }
+
+    const titleEl = document.getElementById('clientCardTitle');
+    const subtitleEl = document.getElementById('clientCardSubtitle');
+    const countEl = document.getElementById('clientStampCount');
+    const fillEl = document.getElementById('clientProgressFill');
+    const textEl = document.getElementById('clientProgressText');
+    const summaryCard = document.getElementById('clientSummary');
+    const summaryTitle = document.getElementById('clientSummaryTitle');
+    const rewardBanner = document.getElementById('clientRewardBanner');
+
+    if (titleEl) titleEl.textContent = businessName;
+    if (subtitleEl) subtitleEl.textContent = `Tu progreso en ${businessName}`;
+
+    if (countEl) {
+        countEl.textContent = `${count} / ${TOTAL_STAMPS}`;
+        countEl.classList.toggle('complete', isComplete);
+    }
+
+    const percentage = Math.round((count / TOTAL_STAMPS) * 100);
+    if (fillEl) fillEl.style.width = `${percentage}%`;
+    if (textEl) textEl.textContent = `${percentage}% completado`;
+
+    if (summaryCard) summaryCard.classList.toggle('complete', isComplete);
+    if (summaryTitle) {
+        if (isComplete) {
+            summaryTitle.textContent = `¡Felicidades! Recompensa en ${businessName} desbloqueada 🎉`;
+        } else if (count === 0) {
+            summaryTitle.textContent = `¡Comienza a acumular sellos en ${businessName}!`;
+        } else {
+            summaryTitle.textContent = `¡Te faltan solo ${TOTAL_STAMPS - count} sellos en ${businessName}!`;
+        }
+    }
+
+    if (rewardBanner) {
+        rewardBanner.classList.toggle('visible', isComplete);
+    }
+
+    // Render read-only stamps grid
     const grid = document.getElementById('clientStampsGrid');
     if (!grid) return;
     grid.innerHTML = '';
 
     for (let i = 0; i < TOTAL_STAMPS; i++) {
         const isLast = i === TOTAL_STAMPS - 1;
-        const isStamped = !!currentStamps[i];
+        const isStamped = !!stamps[i];
 
         const slot = document.createElement('div');
         slot.className = `stamp-slot client-stamp-slot ${isStamped ? 'stamped' : ''} ${isLast ? 'reward-slot' : ''}`;
@@ -328,51 +654,6 @@ function renderClientGrid() {
         slot.appendChild(numberSpan);
 
         grid.appendChild(slot);
-    }
-}
-
-function updateClientProgress() {
-    const count = currentStamps.filter(Boolean).length;
-    const percentage = Math.round((count / TOTAL_STAMPS) * 100);
-    const isComplete = count === TOTAL_STAMPS;
-
-    const countEl = document.getElementById('clientStampCount');
-    const fillEl = document.getElementById('clientProgressFill');
-    const textEl = document.getElementById('clientProgressText');
-    const summaryCard = document.getElementById('clientSummary');
-    const summaryTitle = document.getElementById('clientSummaryTitle');
-    const rewardBanner = document.getElementById('clientRewardBanner');
-
-    if (countEl) {
-        countEl.textContent = `${count} / ${TOTAL_STAMPS}`;
-        countEl.classList.toggle('complete', isComplete);
-    }
-
-    if (fillEl) {
-        fillEl.style.width = `${percentage}%`;
-    }
-
-    if (textEl) {
-        textEl.textContent = `${percentage}% completado`;
-    }
-
-    if (summaryCard) {
-        summaryCard.classList.toggle('complete', isComplete);
-    }
-
-    if (summaryTitle) {
-        const businessSuffix = currentBusinessName ? ` en ${currentBusinessName}` : '';
-        if (isComplete) {
-            summaryTitle.textContent = `¡Felicidades! Recompensa desbloqueada${businessSuffix} 🎉`;
-        } else if (count === 0) {
-            summaryTitle.textContent = `¡Comienza a acumular sellos${businessSuffix}!`;
-        } else {
-            summaryTitle.textContent = `¡Te faltan solo ${TOTAL_STAMPS - count} sellos${businessSuffix}!`;
-        }
-    }
-
-    if (rewardBanner) {
-        rewardBanner.classList.toggle('visible', isComplete);
     }
 }
 
@@ -407,12 +688,10 @@ function renderColorPresets() {
 function selectColorPreset(hex) {
     tempSelectedColor = hex;
 
-    // Update active swatch buttons
     document.querySelectorAll('.color-swatch-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.hex.toLowerCase() === hex.toLowerCase());
     });
 
-    // Sync custom color input & label
     const customInput = document.getElementById('settingsCustomColor');
     const hexText = document.getElementById('settingsColorHex');
     if (customInput) customInput.value = hex;
@@ -428,7 +707,6 @@ function onCustomColorChange(e) {
     const hexText = document.getElementById('settingsColorHex');
     if (hexText) hexText.textContent = hex.toUpperCase();
 
-    // Check if it matches any preset
     document.querySelectorAll('.color-swatch-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.hex.toLowerCase() === hex.toLowerCase());
     });
@@ -523,7 +801,6 @@ async function handleSaveCardSettings(e) {
         currentCardColor = tempSelectedColor;
         applyCardTheme(currentCardColor, currentBusinessName);
 
-        // Hide onboarding banner if visible
         const banner = document.getElementById('sellerOnboardingBanner');
         if (banner) {
             banner.style.display = 'none';
@@ -582,16 +859,21 @@ function launchConfetti() {
     }, 5000);
 }
 
-// Close modal on Escape or outside click
+// Close modals on Escape or outside click
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeCardSettingsModal();
+        closeAddClientModal();
     }
 });
 
 document.addEventListener('click', (e) => {
-    const overlay = document.getElementById('settingsOverlay');
-    if (overlay && e.target === overlay) {
+    const settingsOverlay = document.getElementById('settingsOverlay');
+    if (settingsOverlay && e.target === settingsOverlay) {
         closeCardSettingsModal();
+    }
+    const addClientOverlay = document.getElementById('addClientOverlay');
+    if (addClientOverlay && e.target === addClientOverlay) {
+        closeAddClientModal();
     }
 });
