@@ -29,7 +29,7 @@ auth.onAuthStateChanged(async (user) => {
 
         if (profile) {
             currentUserProfile = profile;
-            showPanelForRole(profile.role, profile.name);
+            showPanelForRole(profile.role, profile.name, profile);
         } else {
             // Profile missing in Firestore (created before or race condition):
             // Gracefully auto-create profile rather than trapping the user with instant sign-out
@@ -47,7 +47,7 @@ auth.onAuthStateChanged(async (user) => {
             try {
                 await saveUserProfile(user.uid, fallbackProfile);
                 currentUserProfile = fallbackProfile;
-                showPanelForRole(fallbackProfile.role, fallbackProfile.name);
+                showPanelForRole(fallbackProfile.role, fallbackProfile.name, fallbackProfile);
             } catch (err) {
                 console.error('Error al generar perfil de respaldo:', err);
                 showAuthError('No se pudo cargar el perfil de usuario. Revisa las reglas de Firestore.');
@@ -79,8 +79,10 @@ function showAuthScreen() {
     showAuthTab('login');
 }
 
-function showPanelForRole(role, userName) {
+function showPanelForRole(role, userName, profile) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+    const userProfile = profile || currentUserProfile;
 
     // Get initial letter for avatar
     const initial = userName ? userName.charAt(0).toUpperCase() : '?';
@@ -95,7 +97,7 @@ function showPanelForRole(role, userName) {
         if (screen) screen.classList.add('active');
 
         if (typeof initSeller === 'function') {
-            initSeller();
+            initSeller(userProfile);
         }
     } else {
         const avatar = document.getElementById('clientAvatar');
@@ -107,7 +109,7 @@ function showPanelForRole(role, userName) {
         if (screen) screen.classList.add('active');
 
         if (typeof initClient === 'function') {
-            initClient();
+            initClient(userProfile);
         }
     }
 }
@@ -181,16 +183,35 @@ async function handleRegister(e) {
         }
 
         // 3. Save profile to Firestore
+        const businessName = (role === 'seller') 
+            ? (document.getElementById('registerBusinessName')?.value.trim() || '') 
+            : '';
+
         const profileData = {
             name: name,
             email: email,
             role: role
         };
+
+        if (role === 'seller') {
+            profileData.businessName = businessName;
+            profileData.cardColor = '#ff6f4a';
+
+            // If business name was provided at registration, also save to card document
+            if (businessName) {
+                try {
+                    await saveCardSettings({ businessName, cardColor: '#ff6f4a' });
+                } catch (cardErr) {
+                    console.warn('No se pudo guardar ajustes iniciales de la tarjeta:', cardErr);
+                }
+            }
+        }
+
         await saveUserProfile(uid, profileData);
 
         // 4. Update state and navigate to appropriate panel
         currentUserProfile = profileData;
-        showPanelForRole(role, name);
+        showPanelForRole(role, name, profileData);
 
     } catch (error) {
         console.error('Error al registrar cuenta:', error);
@@ -323,3 +344,26 @@ function hideAuthError() {
     errorEl.textContent = '';
     errorEl.classList.remove('visible');
 }
+
+// ===================================
+// ROLE SELECTOR LISTENER (SHOW/HIDE BUSINESS NAME)
+// ===================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const roleRadios = document.querySelectorAll('input[name="registerRole"]');
+    const businessNameGroup = document.getElementById('sellerBusinessNameGroup');
+
+    roleRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (businessNameGroup) {
+                if (e.target.value === 'seller') {
+                    businessNameGroup.style.display = 'block';
+                    businessNameGroup.classList.add('fade-in');
+                } else {
+                    businessNameGroup.style.display = 'none';
+                    businessNameGroup.classList.remove('fade-in');
+                }
+            }
+        });
+    });
+});

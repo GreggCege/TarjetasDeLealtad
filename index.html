@@ -175,6 +175,18 @@
                         </div>
                     </div>
 
+                    <!-- Business Name (Only visible for Seller role) -->
+                    <div class="form-group seller-only-field" id="sellerBusinessNameGroup" style="display: none;">
+                        <label for="registerBusinessName" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            Nombre de tu negocio
+                        </label>
+                        <input type="text" id="registerBusinessName" class="form-input" placeholder="Ej: Mi Cafetería, Barbería..." autocomplete="organization">
+                    </div>
+
                     <button type="submit" class="auth-submit-btn" id="registerSubmitBtn">
                         <span class="btn-text">Crear Cuenta</span>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -208,6 +220,13 @@
                         </div>
                     </div>
                     <div class="header-actions">
+                        <button class="customize-header-btn" onclick="openCardSettingsModal()" title="Personalizar nombre y color de la tarjeta">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            </svg>
+                            <span>Personalizar</span>
+                        </button>
                         <div class="user-info">
                             <div class="user-avatar" id="sellerAvatar">V</div>
                             <span class="user-display-name" id="sellerName">Vendedor</span>
@@ -225,14 +244,32 @@
             </header>
 
             <main class="main-content">
+                <!-- Seller Onboarding / Customization Banner -->
+                <div class="seller-onboarding-banner" id="sellerOnboardingBanner" style="display: none;">
+                    <div class="onboarding-badge-icon">🎨</div>
+                    <div class="onboarding-content">
+                        <h3 class="onboarding-title">¡Personaliza tu tarjeta de sellos!</h3>
+                        <p class="onboarding-desc">Ponle el nombre de tu negocio y elige el color de tu marca para que tus clientes la identifiquen.</p>
+                    </div>
+                    <button class="onboarding-btn" onclick="openCardSettingsModal()">Personalizar ahora</button>
+                </div>
+
                 <div class="stamp-card" id="stampCard">
                     <!-- Card Header -->
                     <div class="card-header">
                         <div class="card-title-area">
-                            <h2 class="card-title">Tarjeta de Sellos</h2>
+                            <div class="card-title-wrapper">
+                                <h2 class="card-title" id="sellerCardTitle">Tarjeta de Sellos</h2>
+                                <button class="card-edit-btn" onclick="openCardSettingsModal()" title="Editar nombre de negocio y color">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                        <path d="M12 20h9"/>
+                                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                    </svg>
+                                </button>
+                            </div>
                             <span class="card-badge" id="stampCount">0 / 10</span>
                         </div>
-                        <p class="card-subtitle">Toca una casilla para marcar o desmarcar un sello</p>
+                        <p class="card-subtitle" id="sellerCardSubtitle">Toca una casilla para marcar o desmarcar un sello</p>
                     </div>
 
                     <!-- Progress Bar -->
@@ -331,10 +368,10 @@
                 <div class="stamp-card client-card" id="clientStampCard">
                     <div class="card-header">
                         <div class="card-title-area">
-                            <h2 class="card-title">Tu Tarjeta</h2>
+                            <h2 class="card-title" id="clientCardTitle">Tu Tarjeta</h2>
                             <span class="card-badge" id="clientStampCount">0 / 10</span>
                         </div>
-                        <p class="card-subtitle">Tu progreso hacia la recompensa</p>
+                        <p class="card-subtitle" id="clientCardSubtitle">Tu progreso hacia la recompensa</p>
                     </div>
 
                     <!-- Progress Bar -->
@@ -368,6 +405,111 @@
                 <p>G3</p>
             </footer>
         </section>
+
+        <!-- ============================== -->
+        <!-- CARD SETTINGS MODAL            -->
+        <!-- ============================== -->
+        <div class="settings-overlay" id="settingsOverlay">
+            <div class="settings-modal" id="settingsModal">
+                <div class="settings-header">
+                    <div class="settings-title-area">
+                        <div class="settings-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                                <path d="M2 12h20"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="settings-title">Personalizar Tarjeta</h2>
+                            <p class="settings-subtitle">Configura el nombre y color de tu negocio</p>
+                        </div>
+                    </div>
+                    <button class="settings-close-btn" onclick="closeCardSettingsModal()" aria-label="Cerrar modal">&times;</button>
+                </div>
+
+                <form id="cardSettingsForm" onsubmit="handleSaveCardSettings(event)">
+                    <!-- Business Name Field -->
+                    <div class="form-group">
+                        <label for="settingsBusinessName" class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            Nombre de tu Negocio
+                        </label>
+                        <input type="text" id="settingsBusinessName" class="form-input" placeholder="Ej: Mi Cafetería, Barbería..." maxlength="40" required autocomplete="off" oninput="updateLivePreview()">
+                    </div>
+
+                    <!-- Color Palette Selector -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+                                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+                                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+                                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+                                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/>
+                            </svg>
+                            Color de la Tarjeta
+                        </label>
+                        <div class="color-palette-grid" id="colorPaletteGrid">
+                            <!-- Swatches generated by JS -->
+                        </div>
+                        <div class="custom-color-row">
+                            <label for="settingsCustomColor" class="custom-color-label">
+                                <span class="custom-color-swatch-wrapper">
+                                    <input type="color" id="settingsCustomColor" class="custom-color-picker" value="#ff6f4a" oninput="onCustomColorChange(event)">
+                                </span>
+                                <span class="custom-color-text">Seleccionar otro color</span>
+                            </label>
+                            <span class="custom-color-hex" id="settingsColorHex">#ff6f4a</span>
+                        </div>
+                    </div>
+
+                    <!-- Live Mini Preview -->
+                    <div class="settings-preview-area">
+                        <div class="preview-label-row">
+                            <span class="preview-label">Vista previa en tiempo real</span>
+                        </div>
+                        <div class="mini-card-preview" id="miniCardPreview">
+                            <div class="mini-card-header">
+                                <span class="mini-business-name" id="previewBusinessName">Mi Negocio</span>
+                                <span class="mini-badge" id="previewBadge">4 / 10</span>
+                            </div>
+                            <div class="mini-progress-bar">
+                                <div class="mini-progress-fill" id="previewProgressFill"></div>
+                            </div>
+                            <div class="mini-stamps-grid">
+                                <div class="mini-stamp stamped">✓</div>
+                                <div class="mini-stamp stamped">✓</div>
+                                <div class="mini-stamp stamped">✓</div>
+                                <div class="mini-stamp stamped">✓</div>
+                                <div class="mini-stamp">5</div>
+                                <div class="mini-stamp">6</div>
+                                <div class="mini-stamp">7</div>
+                                <div class="mini-stamp">8</div>
+                                <div class="mini-stamp">9</div>
+                                <div class="mini-stamp reward">🎁</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-feedback" id="settingsFeedback"></div>
+
+                    <!-- Actions -->
+                    <div class="settings-actions">
+                        <button type="button" class="settings-cancel-btn" onclick="closeCardSettingsModal()">Cancelar</button>
+                        <button type="submit" class="settings-save-btn" id="saveCardSettingsBtn">
+                            <span class="btn-text">Guardar Cambios</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18">
+                                <path d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
     </div>
 
