@@ -254,31 +254,60 @@
                     <button class="onboarding-btn" onclick="openCardSettingsModal()">Personalizar ahora</button>
                 </div>
 
-                <!-- Seller Clients Bar (Select client & Add client) -->
+                <!-- Seller Clients Bar (Separated header & full-width searchable dropdown) -->
                 <div class="seller-clients-bar" id="sellerClientsBar">
-                    <div class="clients-selector-group">
-                        <label for="sellerClientSelect" class="clients-selector-label">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                <circle cx="9" cy="7" r="4"/>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    <div class="clients-bar-header">
+                        <div class="clients-bar-title-group">
+                            <div class="clients-bar-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="clients-bar-title">Tus Clientes</h3>
+                                <span class="clients-bar-subtitle" id="clientsCountSubtitle">Selecciona o busca un cliente</span>
+                            </div>
+                        </div>
+                        <button type="button" class="add-client-btn" onclick="openAddClientModal()" title="Agregar nuevo cliente por correo">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            Cliente:
-                        </label>
-                        <div class="select-wrapper">
-                            <select id="sellerClientSelect" class="seller-client-dropdown" onchange="onSellerClientSelectChange(event)">
-                                <option value="">Selecciona un cliente...</option>
-                            </select>
+                            <span>Agregar Cliente</span>
+                        </button>
+                    </div>
+
+                    <div class="clients-dropdown-row">
+                        <!-- Searchable Custom Dropdown -->
+                        <div class="searchable-dropdown" id="sellerSearchableDropdown">
+                            <button type="button" class="dropdown-trigger-btn" id="dropdownTriggerBtn" onclick="toggleClientDropdown(event)" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="trigger-label" id="dropdownTriggerLabel">
+                                    <span class="trigger-placeholder">Seleccionar cliente...</span>
+                                </span>
+                                <svg class="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown Menu with Search Navigation Bar -->
+                            <div class="dropdown-menu-panel" id="dropdownMenuPanel">
+                                <div class="dropdown-search-wrapper">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" class="search-icon">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                    </svg>
+                                    <input type="text" id="clientSearchInput" class="dropdown-search-input" placeholder="Buscar por nombre o correo..." autocomplete="off" oninput="filterSellerClients(event)">
+                                    <button type="button" class="search-clear-btn" id="searchClearBtn" onclick="clearClientSearch(event)" style="display: none;" title="Borrar búsqueda">&times;</button>
+                                </div>
+                                <div class="dropdown-list-container" id="clientDropdownList" role="listbox">
+                                    <!-- Populated dynamically with clients -->
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <button class="add-client-btn" onclick="openAddClientModal()" title="Agregar nuevo cliente por correo">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-                            <line x1="12" y1="5" x2="12" y2="19"/>
-                            <line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                        <span>Agregar Cliente</span>
-                    </button>
                 </div>
 
                 <!-- Active Client Info Strip -->

@@ -169,38 +169,153 @@ async function initSeller(profile) {
     renderColorPresets();
 }
 
-function renderSellerClientsDropdown() {
-    const select = document.getElementById('sellerClientSelect');
-    if (!select) return;
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
-    select.innerHTML = '';
+function renderSellerClientsDropdown(filterQuery = '') {
+    const triggerLabel = document.getElementById('dropdownTriggerLabel');
+    const listContainer = document.getElementById('clientDropdownList');
+    if (!listContainer) return;
 
-    if (sellerCards.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'Sin clientes agregados';
-        select.appendChild(opt);
+    const activeCard = getActiveSellerCard();
+    if (triggerLabel) {
+        if (activeCard) {
+            const count = (activeCard.stamps || []).filter(Boolean).length;
+            const name = escapeHtml(activeCard.clientName || 'Cliente');
+            const email = escapeHtml(activeCard.clientEmail || '');
+            triggerLabel.innerHTML = `
+                <span class="trigger-name">${name}</span>
+                <span class="trigger-badge ${count === TOTAL_STAMPS ? 'complete' : ''}">${count}/10</span>
+                <span class="trigger-email">${email}</span>
+            `;
+        } else {
+            triggerLabel.innerHTML = `<span class="trigger-placeholder">${sellerCards.length > 0 ? 'Selecciona un cliente...' : 'Sin clientes agregados'}</span>`;
+        }
+    }
+
+    listContainer.innerHTML = '';
+
+    const query = (filterQuery || '').toLowerCase().trim();
+    const filteredCards = query
+        ? sellerCards.filter(c => 
+            (c.clientName && c.clientName.toLowerCase().includes(query)) ||
+            (c.clientEmail && c.clientEmail.toLowerCase().includes(query))
+          )
+        : sellerCards;
+
+    if (filteredCards.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'dropdown-empty-result';
+        emptyMsg.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span>${query ? `No se encontraron clientes para "<strong>${escapeHtml(filterQuery)}</strong>"` : 'No hay clientes registrados aún'}</span>
+        `;
+        listContainer.appendChild(emptyMsg);
         return;
     }
 
-    sellerCards.forEach(card => {
-        const opt = document.createElement('option');
-        opt.value = card.id;
+    filteredCards.forEach(card => {
+        const item = document.createElement('div');
+        const isSelected = card.id === selectedCardId;
+        item.className = `client-dropdown-item ${isSelected ? 'selected' : ''}`;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+
         const count = (card.stamps || []).filter(Boolean).length;
-        opt.textContent = `${card.clientName || 'Cliente'} (${count}/10) — ${card.clientEmail}`;
-        if (card.id === selectedCardId) {
-            opt.selected = true;
-        }
-        select.appendChild(opt);
+        const initial = (card.clientName || card.clientEmail || 'C').charAt(0).toUpperCase();
+
+        item.innerHTML = `
+            <div class="item-avatar">${initial}</div>
+            <div class="item-info">
+                <span class="item-name">${escapeHtml(card.clientName || 'Cliente')}</span>
+                <span class="item-email">${escapeHtml(card.clientEmail)}</span>
+            </div>
+            <span class="item-badge ${count === TOTAL_STAMPS ? 'complete' : ''}">${count}/10</span>
+            <svg class="item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+        `;
+
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectSellerClient(card.id);
+        });
+
+        listContainer.appendChild(item);
     });
 }
 
-function onSellerClientSelectChange(e) {
-    const newCardId = e.target.value;
-    if (newCardId) {
-        selectedCardId = newCardId;
-        renderActiveSellerCard();
+function selectSellerClient(cardId) {
+    if (!cardId) return;
+    selectedCardId = cardId;
+    renderActiveSellerCard();
+    renderSellerClientsDropdown();
+    closeClientDropdown();
+}
+
+function toggleClientDropdown(event) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById('sellerSearchableDropdown');
+    const triggerBtn = document.getElementById('dropdownTriggerBtn');
+    const searchInput = document.getElementById('clientSearchInput');
+
+    if (!dropdown) return;
+
+    const isOpen = dropdown.classList.contains('open');
+
+    if (isOpen) {
+        closeClientDropdown();
+    } else {
+        dropdown.classList.add('open');
+        if (triggerBtn) triggerBtn.setAttribute('aria-expanded', 'true');
+        if (searchInput) {
+            searchInput.value = '';
+            const clearBtn = document.getElementById('searchClearBtn');
+            if (clearBtn) clearBtn.style.display = 'none';
+            renderSellerClientsDropdown('');
+            setTimeout(() => searchInput.focus(), 80);
+        }
     }
+}
+
+function closeClientDropdown() {
+    const dropdown = document.getElementById('sellerSearchableDropdown');
+    const triggerBtn = document.getElementById('dropdownTriggerBtn');
+    if (dropdown) dropdown.classList.remove('open');
+    if (triggerBtn) triggerBtn.setAttribute('aria-expanded', 'false');
+}
+
+function filterSellerClients(event) {
+    const query = event.target.value;
+    const clearBtn = document.getElementById('searchClearBtn');
+    if (clearBtn) {
+        clearBtn.style.display = query.trim() ? 'block' : 'none';
+    }
+    renderSellerClientsDropdown(query);
+}
+
+function clearClientSearch(event) {
+    if (event) event.stopPropagation();
+    const searchInput = document.getElementById('clientSearchInput');
+    const clearBtn = document.getElementById('searchClearBtn');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+    }
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    renderSellerClientsDropdown('');
 }
 
 function getActiveSellerCard() {
@@ -859,11 +974,12 @@ function launchConfetti() {
     }, 5000);
 }
 
-// Close modals on Escape or outside click
+// Close modals & dropdowns on Escape or outside click
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeCardSettingsModal();
         closeAddClientModal();
+        closeClientDropdown();
     }
 });
 
@@ -875,5 +991,13 @@ document.addEventListener('click', (e) => {
     const addClientOverlay = document.getElementById('addClientOverlay');
     if (addClientOverlay && e.target === addClientOverlay) {
         closeAddClientModal();
+    }
+
+    // Close client search dropdown if clicked outside
+    const dropdown = document.getElementById('sellerSearchableDropdown');
+    if (dropdown && dropdown.classList.contains('open')) {
+        if (!dropdown.contains(e.target)) {
+            closeClientDropdown();
+        }
     }
 });
