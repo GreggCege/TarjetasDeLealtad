@@ -375,7 +375,19 @@
                                     </svg>
                                 </button>
                             </div>
-                            <span class="card-badge" id="stampCount">0 / 10</span>
+                            <div class="card-header-right-group">
+                                <button class="reward-config-pill-btn" onclick="openRewardSettingsModal()" title="Configurar premios y sellos" id="rewardConfigPillBtn">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                                        <path d="M20 12V22H4V12"/>
+                                        <path d="M22 7H2v5h20V7z"/>
+                                        <path d="M12 22V7"/>
+                                        <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                                        <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                                    </svg>
+                                    <span id="rewardConfigPillLabel">10 sellos · 1 premio</span>
+                                </button>
+                                <span class="card-badge" id="stampCount">0 / 10</span>
+                            </div>
                         </div>
                         <p class="card-subtitle" id="sellerCardSubtitle">Toca una casilla para marcar o desmarcar un sello</p>
                     </div>
@@ -410,7 +422,7 @@
                             <p class="reward-subtitle" id="rewardSubtitle">Tu cliente ha completado sus 10 sellos</p>
                             <div class="reward-badge">
                                 <span class="reward-badge-icon">🎁</span>
-                                <span class="reward-badge-text">Dile a tu cliente que ganó su recompensa</span>
+                                <span class="reward-badge-text" id="rewardBadgeText">Dile a tu cliente que ganó su recompensa</span>
                             </div>
                             <p class="reward-description">El cliente ha completado su tarjeta. Entrégale su premio y
                                 reinicia la tarjeta para comenzar de nuevo.
@@ -533,7 +545,7 @@
                     <div class="client-reward-banner" id="clientRewardBanner">
                         <div class="client-reward-banner-icon">🎉</div>
                         <h3 class="client-reward-banner-title">¡Felicidades!</h3>
-                        <p class="client-reward-banner-text">Has completado tu tarjeta. Acude con el vendedor para reclamar
+                        <p class="client-reward-banner-text" id="clientRewardBannerText">Has completado tu tarjeta. Acude con el vendedor para reclamar
                             tu recompensa.</p>
                     </div>
                 </div>
@@ -711,6 +723,89 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- ============================== -->
+    <!-- REWARD SETTINGS MODAL          -->
+    <!-- ============================== -->
+    <div class="settings-overlay" id="rewardSettingsOverlay">
+        <div class="settings-modal reward-settings-modal" id="rewardSettingsModal">
+            <div class="settings-header">
+                <div class="settings-title-area">
+                    <div class="settings-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                            <path d="M20 12V22H4V12"/>
+                            <path d="M22 7H2v5h20V7z"/>
+                            <path d="M12 22V7"/>
+                            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="settings-title">Configurar Premios</h2>
+                        <p class="settings-subtitle">Define cuántos sellos y qué premios ganarán tus clientes</p>
+                    </div>
+                </div>
+                <button class="settings-close-btn" onclick="closeRewardSettingsModal()" aria-label="Cerrar modal">&times;</button>
+            </div>
+
+            <form id="rewardSettingsForm" onsubmit="handleSaveRewardSettings(event)">
+
+                <!-- Total Stamps Selector -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Total de sellos para completar la tarjeta
+                    </label>
+                    <div class="stamp-count-selector" id="stampCountSelector">
+                        <!-- Stamp count pills generated by JS -->
+                    </div>
+                    <span class="form-hint" id="stampCountHint">Los clientes necesitarán 10 sellos para completar la tarjeta.</span>
+                </div>
+
+                <!-- Rewards List -->
+                <div class="form-group">
+                    <div class="rewards-list-header">
+                        <label class="form-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M20 12V22H4V12"/>
+                                <path d="M22 7H2v5h20V7z"/>
+                                <path d="M12 22V7"/>
+                                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                            </svg>
+                            Premios por número de sellos
+                        </label>
+                        <button type="button" class="add-reward-row-btn" onclick="addRewardRow()" id="addRewardRowBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Agregar premio
+                        </button>
+                    </div>
+                    <div class="rewards-list" id="rewardsList">
+                        <!-- Reward rows generated by JS -->
+                    </div>
+                    <span class="form-hint">Puedes tener varios premios en distintos hitos (ej: a los 5 sellos, a los 10, etc.)</span>
+                </div>
+
+                <div class="settings-feedback" id="rewardSettingsFeedback"></div>
+
+                <div class="settings-actions">
+                    <button type="button" class="settings-cancel-btn" onclick="closeRewardSettingsModal()">Cancelar</button>
+                    <button type="submit" class="settings-save-btn" id="saveRewardSettingsBtn">
+                        <span class="btn-text">Guardar Premios</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18">
+                            <path d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Firebase SDK (compat — no bundler needed) -->

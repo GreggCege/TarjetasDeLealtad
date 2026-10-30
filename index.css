@@ -954,22 +954,35 @@ body {
 
 /* Last stamp (reward) */
 .stamp-slot.reward-slot {
-    border-color: var(--coral-300);
+    border-color: var(--card-primary-border, var(--coral-300));
     border-style: solid;
-    background: linear-gradient(135deg, var(--coral-50), rgba(255, 111, 74, 0.08));
+    background: var(--card-primary-bg-light, linear-gradient(135deg, var(--coral-50), rgba(255, 111, 74, 0.08)));
+    box-shadow: 0 0 0 1px var(--card-primary-border, rgba(255, 111, 74, 0.15)), 0 2px 8px var(--card-primary-glow, rgba(255, 111, 74, 0.15));
 }
 
 .stamp-slot.reward-slot .stamp-number {
     font-size: 1.1rem;
-    color: var(--coral-400);
+    color: var(--card-primary, var(--coral-400));
 }
 
 .stamp-slot.reward-slot::before {
     content: none;
 }
 
+.seller-screen .stamp-slot.reward-slot:hover {
+    border-color: var(--card-primary, var(--coral-400));
+    background: var(--card-primary-bg-hover, var(--coral-50));
+    transform: scale(1.05);
+}
+
+.stamp-slot.reward-slot.stamped {
+    border: 2.5px solid var(--card-primary, var(--coral-400));
+    background: var(--card-primary-bg-light, linear-gradient(135deg, var(--coral-50), var(--coral-100)));
+}
+
 .stamp-slot.reward-slot.stamped::after {
-    background: linear-gradient(135deg, var(--coral-500), var(--coral-400));
+    background: var(--card-primary-gradient, linear-gradient(135deg, var(--coral-500), var(--coral-400)));
+    box-shadow: 0 2px 10px var(--card-primary-glow, rgba(255, 111, 74, 0.45));
     width: 60%;
     height: 60%;
 }
@@ -1007,13 +1020,13 @@ body {
 }
 
 .client-stamp-slot.stamped:hover {
-    border-color: var(--coral-400) !important;
-    background: linear-gradient(135deg, var(--coral-50), var(--coral-100)) !important;
+    border-color: var(--card-primary, var(--coral-400)) !important;
+    background: var(--card-primary-bg-light, linear-gradient(135deg, var(--coral-50), var(--coral-100))) !important;
 }
 
 .client-stamp-slot.reward-slot:hover {
-    border-color: var(--coral-300) !important;
-    background: linear-gradient(135deg, var(--coral-50), rgba(255, 111, 74, 0.08)) !important;
+    border-color: var(--card-primary-border, var(--coral-300)) !important;
+    background: var(--card-primary-bg-light, linear-gradient(135deg, var(--coral-50), rgba(255, 111, 74, 0.08))) !important;
 }
 
 /* ===================================
@@ -1303,7 +1316,7 @@ body {
 .reward-title {
     font-size: 1.8rem;
     font-weight: 800;
-    background: linear-gradient(135deg, var(--coral-600), var(--coral-400));
+    background: var(--card-primary-gradient, linear-gradient(135deg, var(--coral-600), var(--coral-400)));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -1320,8 +1333,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: linear-gradient(135deg, var(--coral-50), var(--coral-100));
-    border: 1.5px solid var(--coral-200);
+    background: var(--card-primary-bg-light, linear-gradient(135deg, var(--coral-50), var(--coral-100)));
+    border: 1.5px solid var(--card-primary-border, var(--coral-200));
     border-radius: var(--radius-full);
     padding: 12px 24px;
     margin-bottom: 16px;
@@ -1334,7 +1347,7 @@ body {
 .reward-badge-text {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--coral-600);
+    color: var(--card-primary, var(--coral-600));
 }
 
 .reward-description {
@@ -1353,7 +1366,7 @@ body {
 .reward-claim-btn {
     width: 100%;
     padding: 15px 24px;
-    background: linear-gradient(135deg, var(--coral-500), var(--coral-400));
+    background: var(--card-primary-gradient, linear-gradient(135deg, var(--coral-500), var(--coral-400)));
     color: var(--white);
     border: none;
     border-radius: var(--radius-lg);
@@ -1366,12 +1379,12 @@ body {
     justify-content: center;
     gap: 8px;
     transition: all 0.3s var(--ease-out);
-    box-shadow: var(--shadow-coral);
+    box-shadow: 0 4px 15px var(--card-primary-glow, var(--shadow-coral));
 }
 
 .reward-claim-btn:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-coral-lg);
+    box-shadow: 0 8px 25px var(--card-primary-glow-lg, var(--shadow-coral-lg));
 }
 
 .reward-close-btn {
@@ -1971,7 +1984,21 @@ body {
 }
 
 .mini-stamp.reward {
-    border-color: var(--preview-border, var(--coral-200));
+    border-style: solid;
+    border-color: var(--preview-primary, var(--coral-500));
+    background: var(--preview-bg-light, rgba(255, 111, 74, 0.14));
+    color: var(--preview-primary, var(--coral-500));
+    box-shadow: 0 0 0 1px var(--preview-border, rgba(255, 111, 74, 0.2)), 0 2px 6px var(--preview-glow, rgba(255, 111, 74, 0.25));
+    font-size: 0.75rem;
+    transition: all 0.25s var(--ease-out);
+}
+
+.mini-stamp.reward.stamped {
+    border-style: solid;
+    border-color: var(--preview-primary, var(--coral-500));
+    background: var(--preview-gradient, linear-gradient(135deg, var(--coral-500), var(--coral-400)));
+    color: var(--white);
+    box-shadow: 0 2px 8px var(--preview-glow, rgba(255, 111, 74, 0.4));
 }
 
 /* Feedback message */
@@ -2046,6 +2073,209 @@ body {
     opacity: 0.65;
     cursor: not-allowed;
     transform: none;
+}
+
+/* ===================================
+   REWARD SETTINGS MODAL STYLES
+   =================================== */
+
+/* Pill button on the card header */
+.card-header-right-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reward-config-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+}
+
+.reward-config-pill-btn:hover {
+    background: var(--card-primary-bg-light, var(--coral-50));
+    border-color: var(--card-primary-border, var(--coral-200));
+    color: var(--card-primary, var(--coral-600));
+}
+
+/* Stamp Count Selector */
+.stamp-count-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.stamp-count-pill {
+    width: 48px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--gray-200);
+    background: var(--gray-50);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s var(--ease-out);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stamp-count-pill:hover {
+    border-color: var(--card-primary-border, var(--coral-300));
+    background: var(--card-primary-bg-light, var(--coral-50));
+    color: var(--card-primary, var(--coral-600));
+}
+
+.stamp-count-pill.active {
+    background: var(--card-primary-gradient, linear-gradient(135deg, var(--coral-500), var(--coral-400)));
+    border-color: transparent;
+    color: var(--white);
+    box-shadow: 0 4px 14px var(--card-primary-glow, var(--shadow-coral));
+    transform: scale(1.08);
+}
+
+/* Rewards List */
+.rewards-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.rewards-list-header .form-label {
+    margin: 0;
+}
+
+.add-reward-row-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    background: var(--white);
+    border: 1.5px solid var(--card-primary-border, var(--coral-200));
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--card-primary, var(--coral-600));
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.add-reward-row-btn:hover {
+    background: var(--card-primary-bg-light, var(--coral-50));
+    box-shadow: 0 2px 8px var(--card-primary-glow, var(--shadow-coral));
+}
+
+.rewards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rewards-list-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    padding: 16px 0;
+}
+
+/* Individual Reward Row */
+.reward-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    transition: border-color 0.2s;
+}
+
+.reward-row:hover {
+    border-color: var(--gray-300);
+}
+
+.reward-row-stamp-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.reward-row-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.reward-stamp-select {
+    padding: 6px 8px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--card-primary, var(--coral-600));
+    background: var(--white);
+    cursor: pointer;
+    appearance: auto;
+    min-width: 80px;
+    transition: border-color 0.2s;
+}
+
+.reward-stamp-select:focus {
+    outline: none;
+    border-color: var(--card-primary, var(--coral-400));
+}
+
+.reward-desc-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+    margin-bottom: 0 !important;
+}
+
+.reward-row-delete-btn {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    transition: all 0.18s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reward-row-delete-btn:hover {
+    color: #EF4444;
+    background: #FEF2F2;
+}
+
+.reward-settings-modal {
+    max-width: 520px;
 }
 
 /* ===================================

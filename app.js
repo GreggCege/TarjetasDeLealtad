@@ -2,12 +2,17 @@
 // STAMP CARD APP - Multi-Client Architecture
 // ===================================
 
-const TOTAL_STAMPS = 10;
+const DEFAULT_TOTAL_STAMPS = 10;
+let TOTAL_STAMPS = DEFAULT_TOTAL_STAMPS;
 
 // Seller State
 let sellerCards = [];
 let selectedCardId = null;
 let sellerCardsUnsubscribe = null;
+let currentTotalStamps = DEFAULT_TOTAL_STAMPS;
+let currentRewards = [{ stamps: DEFAULT_TOTAL_STAMPS, description: 'Premio especial' }];
+let tempTotalStamps = DEFAULT_TOTAL_STAMPS;
+let tempRewards = [];
 
 // Client State
 let clientCards = [];
@@ -80,7 +85,17 @@ function applyCardTheme(colorHex, businessName) {
 
     const palette = generatePalette(currentCardColor);
 
-    // Apply CSS variables to cards
+    // Apply CSS variables to root and cards
+    document.documentElement.style.setProperty('--card-primary', palette.primary);
+    document.documentElement.style.setProperty('--card-primary-dark', palette.darker);
+    document.documentElement.style.setProperty('--card-primary-light', palette.lighter);
+    document.documentElement.style.setProperty('--card-primary-gradient', palette.gradient);
+    document.documentElement.style.setProperty('--card-primary-bg-light', palette.bgLight);
+    document.documentElement.style.setProperty('--card-primary-bg-hover', palette.bgHover);
+    document.documentElement.style.setProperty('--card-primary-border', palette.border);
+    document.documentElement.style.setProperty('--card-primary-glow', palette.glow);
+    document.documentElement.style.setProperty('--card-primary-glow-lg', palette.glowLg);
+
     const cards = document.querySelectorAll('.stamp-card');
     cards.forEach(card => {
         card.style.setProperty('--card-primary', palette.primary);
@@ -130,6 +145,13 @@ async function initSeller(profile) {
     currentBusinessName = cardSettings.businessName || profile?.businessName || '';
     currentCardColor = cardSettings.cardColor || profile?.cardColor || '#ff6f4a';
 
+    // Load reward settings
+    const rewardSettings = await loadRewardSettings();
+    currentTotalStamps = rewardSettings.totalStamps || DEFAULT_TOTAL_STAMPS;
+    TOTAL_STAMPS = currentTotalStamps;
+    currentRewards = rewardSettings.rewards || [{ stamps: currentTotalStamps, description: 'Premio especial' }];
+    updateRewardConfigPill();
+
     applyCardTheme(currentCardColor, currentBusinessName);
 
     // Check onboarding banner
@@ -169,6 +191,16 @@ async function initSeller(profile) {
     renderColorPresets();
 }
 
+// Returns the effective totalStamps for a given card (falls back to global setting)
+function getCardTotalStamps(card) {
+    return (card && card.totalStamps) ? card.totalStamps : TOTAL_STAMPS;
+}
+
+// Returns the effective rewards for a given card
+function getCardRewards(card) {
+    return (card && card.rewards && card.rewards.length > 0) ? card.rewards : currentRewards;
+}
+
 function escapeHtml(str) {
     if (!str) return '';
     return str
@@ -187,12 +219,13 @@ function renderSellerClientsDropdown(filterQuery = '') {
     const activeCard = getActiveSellerCard();
     if (triggerLabel) {
         if (activeCard) {
+            const cardTotal = getCardTotalStamps(activeCard);
             const count = (activeCard.stamps || []).filter(Boolean).length;
             const name = escapeHtml(activeCard.clientName || 'Cliente');
             const email = escapeHtml(activeCard.clientEmail || '');
             triggerLabel.innerHTML = `
                 <span class="trigger-name">${name}</span>
-                <span class="trigger-badge ${count === TOTAL_STAMPS ? 'complete' : ''}">${count}/10</span>
+                <span class="trigger-badge ${count === cardTotal ? 'complete' : ''}">${count}/${cardTotal}</span>
                 <span class="trigger-email">${email}</span>
             `;
         } else {
@@ -231,6 +264,7 @@ function renderSellerClientsDropdown(filterQuery = '') {
         item.setAttribute('role', 'option');
         item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
 
+        const cardTotal = getCardTotalStamps(card);
         const count = (card.stamps || []).filter(Boolean).length;
         const initial = (card.clientName || card.clientEmail || 'C').charAt(0).toUpperCase();
 
@@ -240,7 +274,7 @@ function renderSellerClientsDropdown(filterQuery = '') {
                 <span class="item-name">${escapeHtml(card.clientName || 'Cliente')}</span>
                 <span class="item-email">${escapeHtml(card.clientEmail)}</span>
             </div>
-            <span class="item-badge ${count === TOTAL_STAMPS ? 'complete' : ''}">${count}/10</span>
+            <span class="item-badge ${count === cardTotal ? 'complete' : ''}">${count}/${cardTotal}</span>
             <svg class="item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16">
                 <polyline points="20 6 9 17 4 12"/>
             </svg>
@@ -326,6 +360,9 @@ function renderActiveSellerCard() {
     const card = getActiveSellerCard();
     if (!card) return;
 
+    const cardTotal = getCardTotalStamps(card);
+    const rewards = getCardRewards(card);
+
     // Update active client strip
     const avatarEl = document.getElementById('activeClientAvatar');
     const nameEl = document.getElementById('activeClientName');
@@ -340,40 +377,48 @@ function renderActiveSellerCard() {
     if (nameEl) nameEl.textContent = displayName;
     if (emailEl) emailEl.textContent = card.clientEmail;
     if (pillEl) {
-        pillEl.textContent = `${stampsCount} / ${TOTAL_STAMPS} sellos`;
-        pillEl.classList.toggle('complete', stampsCount === TOTAL_STAMPS);
+        pillEl.textContent = `${stampsCount} / ${cardTotal} sellos`;
+        pillEl.classList.toggle('complete', stampsCount === cardTotal);
     }
 
     // Render stamps grid
-    renderSellerGrid(card.stamps || new Array(TOTAL_STAMPS).fill(false));
-    updateSellerProgress(stampsCount);
+    renderSellerGrid(card.stamps || new Array(cardTotal).fill(false), cardTotal, rewards);
+    updateSellerProgress(stampsCount, cardTotal);
 
-    // Check reward
-    if (stampsCount === TOTAL_STAMPS) {
+    // Check reward milestones
+    const hitReward = rewards.find(r => r.stamps === stampsCount);
+    if (hitReward) {
         const overlay = document.getElementById('rewardOverlay');
         if (overlay && !overlay.classList.contains('visible') && !overlay.dataset.dismissed) {
-            showRewardOverlay(displayName);
+            showRewardOverlay(displayName, hitReward.description);
         }
     }
 }
 
-function renderSellerGrid(stampsArray) {
+function renderSellerGrid(stampsArray, cardTotal, rewards) {
+    const total = cardTotal || TOTAL_STAMPS;
+    const rewardsList = rewards || currentRewards;
     const grid = document.getElementById('stampsGrid');
     if (!grid) return;
     grid.innerHTML = '';
 
-    for (let i = 0; i < TOTAL_STAMPS; i++) {
-        const isLast = i === TOTAL_STAMPS - 1;
+    for (let i = 0; i < total; i++) {
+        const isLast = i === total - 1;
         const isStamped = !!stampsArray[i];
+        const stampNum = i + 1;
+        const rewardAtThis = rewardsList.find(r => r.stamps === stampNum);
+        const isRewardSlot = !!rewardAtThis || isLast;
 
         const slot = document.createElement('div');
-        slot.className = `stamp-slot ${isStamped ? 'stamped' : ''} ${isLast ? 'reward-slot' : ''}`;
-        slot.id = `seller-stamp-${i + 1}`;
-        slot.title = isStamped ? `Sello ${i + 1} (marcado - clic para desmarcar)` : `Sello ${i + 1} (clic para marcar)`;
+        slot.className = `stamp-slot ${isStamped ? 'stamped' : ''} ${isRewardSlot ? 'reward-slot' : ''}`;
+        slot.id = `seller-stamp-${stampNum}`;
+        slot.title = isStamped
+            ? `Sello ${stampNum} (marcado — clic para desmarcar)`
+            : `Sello ${stampNum} (clic para marcar)${rewardAtThis ? ' 🎁 ' + rewardAtThis.description : ''}`;
 
         const numberSpan = document.createElement('span');
         numberSpan.className = 'stamp-number';
-        numberSpan.textContent = isLast ? '🎁' : (i + 1);
+        numberSpan.textContent = isRewardSlot ? '🎁' : stampNum;
         slot.appendChild(numberSpan);
 
         slot.addEventListener('click', () => toggleStamp(i));
@@ -385,7 +430,9 @@ async function toggleStamp(index) {
     const card = getActiveSellerCard();
     if (!card) return;
 
-    const currentStamps = [...(card.stamps || new Array(TOTAL_STAMPS).fill(false))];
+    const cardTotal = getCardTotalStamps(card);
+    const rewards = getCardRewards(card);
+    const currentStamps = [...(card.stamps || new Array(cardTotal).fill(false))];
     currentStamps[index] = !currentStamps[index];
 
     // Optimistic local update
@@ -393,8 +440,9 @@ async function toggleStamp(index) {
     renderActiveSellerCard();
 
     const count = currentStamps.filter(Boolean).length;
-    if (count === TOTAL_STAMPS) {
-        showRewardOverlay(card.clientName);
+    const hitReward = rewards.find(r => r.stamps === count);
+    if (hitReward) {
+        showRewardOverlay(card.clientName, hitReward.description);
     }
 
     // Persist to Firestore
@@ -405,8 +453,9 @@ async function toggleStamp(index) {
     }
 }
 
-function updateSellerProgress(count) {
-    const percentage = Math.round((count / TOTAL_STAMPS) * 100);
+function updateSellerProgress(count, cardTotal) {
+    const total = cardTotal || TOTAL_STAMPS;
+    const percentage = Math.round((count / total) * 100);
 
     const countEl = document.getElementById('stampCount');
     const fillEl = document.getElementById('progressFill');
@@ -414,8 +463,8 @@ function updateSellerProgress(count) {
     const cardEl = document.getElementById('stampCard');
 
     if (countEl) {
-        countEl.textContent = `${count} / ${TOTAL_STAMPS}`;
-        countEl.classList.toggle('complete', count === TOTAL_STAMPS);
+        countEl.textContent = `${count} / ${total}`;
+        countEl.classList.toggle('complete', count === total);
     }
 
     if (fillEl) {
@@ -427,17 +476,21 @@ function updateSellerProgress(count) {
     }
 
     if (cardEl) {
-        cardEl.classList.toggle('complete', count === TOTAL_STAMPS);
+        cardEl.classList.toggle('complete', count === total);
     }
 }
 
-function showRewardOverlay(clientName) {
+function showRewardOverlay(clientName, rewardDescription) {
     const overlay = document.getElementById('rewardOverlay');
     const subtitle = document.getElementById('rewardSubtitle');
+    const rewardBadgeText = document.getElementById('rewardBadgeText');
     if (!overlay) return;
 
     if (subtitle && clientName) {
-        subtitle.textContent = `${clientName} ha completado sus 10 sellos`;
+        subtitle.textContent = `${clientName} ha completado un hito de sellos`;
+    }
+    if (rewardBadgeText) {
+        rewardBadgeText.textContent = rewardDescription || 'Dile a tu cliente que ganó su recompensa';
     }
 
     delete overlay.dataset.dismissed;
@@ -449,7 +502,8 @@ async function claimReward() {
     const card = getActiveSellerCard();
     if (!card) return closeReward();
 
-    const emptyStamps = new Array(TOTAL_STAMPS).fill(false);
+    const cardTotal = getCardTotalStamps(card);
+    const emptyStamps = new Array(cardTotal).fill(false);
     card.stamps = emptyStamps;
     await saveCardStamps(card.id, emptyStamps);
 
@@ -473,9 +527,14 @@ async function handleResetClientCard() {
         return;
     }
 
+    const cardTotal = getCardTotalStamps(card);
     try {
-        await resetClientCard(card.id);
-        card.stamps = new Array(TOTAL_STAMPS).fill(false);
+        const emptyStamps = new Array(cardTotal).fill(false);
+        await db.collection('cards').doc(card.id).set({
+            stamps: emptyStamps,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        card.stamps = emptyStamps;
         renderActiveSellerCard();
     } catch (err) {
         alert('Error al reiniciar sellos');
@@ -572,6 +631,8 @@ async function handleAddClientSubmit(e) {
             sellerName: currentUser.displayName || 'Vendedor',
             businessName: currentBusinessName || 'Mi Negocio',
             cardColor: currentCardColor || '#ff6f4a',
+            totalStamps: currentTotalStamps,
+            rewards: currentRewards,
             clientEmail: email,
             clientName: name
         });
@@ -696,9 +757,11 @@ function renderActiveClientCard() {
     // Apply this business's theme
     const cardColor = card.cardColor || '#ff6f4a';
     const businessName = card.businessName || 'Tarjeta de Sellos';
-    const stamps = card.stamps || new Array(TOTAL_STAMPS).fill(false);
+    const cardTotal = getCardTotalStamps(card);
+    const rewards = getCardRewards(card);
+    const stamps = card.stamps || new Array(cardTotal).fill(false);
     const count = stamps.filter(Boolean).length;
-    const isComplete = count === TOTAL_STAMPS;
+    const isComplete = count === cardTotal;
 
     const palette = generatePalette(cardColor);
     const clientCardEl = document.getElementById('clientStampCard');
@@ -722,16 +785,17 @@ function renderActiveClientCard() {
     const summaryCard = document.getElementById('clientSummary');
     const summaryTitle = document.getElementById('clientSummaryTitle');
     const rewardBanner = document.getElementById('clientRewardBanner');
+    const rewardBannerText = document.getElementById('clientRewardBannerText');
 
     if (titleEl) titleEl.textContent = businessName;
     if (subtitleEl) subtitleEl.textContent = `Tu progreso en ${businessName}`;
 
     if (countEl) {
-        countEl.textContent = `${count} / ${TOTAL_STAMPS}`;
+        countEl.textContent = `${count} / ${cardTotal}`;
         countEl.classList.toggle('complete', isComplete);
     }
 
-    const percentage = Math.round((count / TOTAL_STAMPS) * 100);
+    const percentage = Math.round((count / cardTotal) * 100);
     if (fillEl) fillEl.style.width = `${percentage}%`;
     if (textEl) textEl.textContent = `${percentage}% completado`;
 
@@ -742,12 +806,17 @@ function renderActiveClientCard() {
         } else if (count === 0) {
             summaryTitle.textContent = `¡Comienza a acumular sellos en ${businessName}!`;
         } else {
-            summaryTitle.textContent = `¡Te faltan solo ${TOTAL_STAMPS - count} sellos en ${businessName}!`;
+            summaryTitle.textContent = `¡Te faltan solo ${cardTotal - count} sellos en ${businessName}!`;
         }
     }
 
+    // Show reward description if applicable
+    const hitReward = rewards.find(r => r.stamps === count);
     if (rewardBanner) {
-        rewardBanner.classList.toggle('visible', isComplete);
+        rewardBanner.classList.toggle('visible', isComplete || !!hitReward);
+    }
+    if (rewardBannerText && (isComplete || hitReward)) {
+        rewardBannerText.textContent = hitReward ? hitReward.description : (rewards[rewards.length - 1]?.description || 'Reclama tu recompensa con el vendedor');
     }
 
     // Render read-only stamps grid
@@ -755,17 +824,21 @@ function renderActiveClientCard() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    for (let i = 0; i < TOTAL_STAMPS; i++) {
-        const isLast = i === TOTAL_STAMPS - 1;
+    for (let i = 0; i < cardTotal; i++) {
+        const isLast = i === cardTotal - 1;
         const isStamped = !!stamps[i];
+        const stampNum = i + 1;
+        const rewardAtThis = rewards.find(r => r.stamps === stampNum);
+        const isRewardSlot = !!rewardAtThis || isLast;
 
         const slot = document.createElement('div');
-        slot.className = `stamp-slot client-stamp-slot ${isStamped ? 'stamped' : ''} ${isLast ? 'reward-slot' : ''}`;
-        slot.id = `client-stamp-${i + 1}`;
+        slot.className = `stamp-slot client-stamp-slot ${isStamped ? 'stamped' : ''} ${isRewardSlot ? 'reward-slot' : ''}`;
+        slot.id = `client-stamp-${stampNum}`;
+        if (rewardAtThis) slot.title = rewardAtThis.description;
 
         const numberSpan = document.createElement('span');
         numberSpan.className = 'stamp-number';
-        numberSpan.textContent = isLast ? '🎁' : (i + 1);
+        numberSpan.textContent = isRewardSlot ? '🎁' : stampNum;
         slot.appendChild(numberSpan);
 
         grid.appendChild(slot);
@@ -979,6 +1052,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeCardSettingsModal();
         closeAddClientModal();
+        closeRewardSettingsModal();
         closeClientDropdown();
     }
 });
@@ -992,6 +1066,10 @@ document.addEventListener('click', (e) => {
     if (addClientOverlay && e.target === addClientOverlay) {
         closeAddClientModal();
     }
+    const rewardSettingsOverlay = document.getElementById('rewardSettingsOverlay');
+    if (rewardSettingsOverlay && e.target === rewardSettingsOverlay) {
+        closeRewardSettingsModal();
+    }
 
     // Close client search dropdown if clicked outside
     const dropdown = document.getElementById('sellerSearchableDropdown');
@@ -1001,3 +1079,187 @@ document.addEventListener('click', (e) => {
         }
     }
 });
+
+// ===================================
+// REWARD SETTINGS MODAL
+// ===================================
+
+const STAMP_COUNT_OPTIONS = [5, 6, 7, 8, 9, 10, 12, 15, 20];
+
+function updateRewardConfigPill() {
+    const pillLabel = document.getElementById('rewardConfigPillLabel');
+    if (!pillLabel) return;
+    const rewardCount = currentRewards.length;
+    pillLabel.textContent = `${currentTotalStamps} sellos · ${rewardCount} ${rewardCount === 1 ? 'premio' : 'premios'}`;
+}
+
+function openRewardSettingsModal() {
+    const overlay = document.getElementById('rewardSettingsOverlay');
+    const feedback = document.getElementById('rewardSettingsFeedback');
+    if (feedback) { feedback.textContent = ''; feedback.className = 'settings-feedback'; }
+
+    tempTotalStamps = currentTotalStamps;
+    tempRewards = currentRewards.map(r => ({ ...r }));
+
+    renderStampCountSelector();
+    renderRewardsList();
+
+    if (overlay) {
+        overlay.classList.add('visible');
+    }
+}
+
+function closeRewardSettingsModal() {
+    const overlay = document.getElementById('rewardSettingsOverlay');
+    if (overlay) overlay.classList.remove('visible');
+}
+
+function renderStampCountSelector() {
+    const container = document.getElementById('stampCountSelector');
+    if (!container) return;
+    container.innerHTML = '';
+
+    STAMP_COUNT_OPTIONS.forEach(n => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `stamp-count-pill ${n === tempTotalStamps ? 'active' : ''}`;
+        btn.textContent = n;
+        btn.title = `${n} sellos`;
+        btn.addEventListener('click', () => {
+            tempTotalStamps = n;
+            renderStampCountSelector();
+            // Update hint
+            const hint = document.getElementById('stampCountHint');
+            if (hint) hint.textContent = `Los clientes necesitarán ${n} sellos para completar la tarjeta.`;
+            // Clamp rewards that exceed the new total
+            tempRewards = tempRewards.map(r => ({ ...r, stamps: Math.min(r.stamps, n) }));
+            renderRewardsList();
+        });
+        container.appendChild(btn);
+    });
+}
+
+function renderRewardsList() {
+    const list = document.getElementById('rewardsList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (tempRewards.length === 0) {
+        list.innerHTML = `<p class="rewards-list-empty">No hay premios configurados. Agrega al menos uno.</p>`;
+        return;
+    }
+
+    tempRewards.forEach((reward, idx) => {
+        const row = document.createElement('div');
+        row.className = 'reward-row';
+
+        const stampOptions = Array.from({ length: tempTotalStamps }, (_, i) => i + 1)
+            .map(n => `<option value="${n}" ${n === reward.stamps ? 'selected' : ''}>${n} ${n === 1 ? 'sello' : 'sellos'}</option>`)
+            .join('');
+
+        row.innerHTML = `
+            <div class="reward-row-stamp-select">
+                <label class="reward-row-label">Al sello #</label>
+                <select class="reward-stamp-select" data-idx="${idx}">
+                    ${stampOptions}
+                </select>
+            </div>
+            <input type="text" class="reward-desc-input form-input" data-idx="${idx}" placeholder="Descripción del premio..." value="${escapeHtml(reward.description)}" maxlength="80">
+            <button type="button" class="reward-row-delete-btn" data-idx="${idx}" title="Eliminar premio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        `;
+
+        // Events
+        row.querySelector('.reward-stamp-select').addEventListener('change', (e) => {
+            tempRewards[idx].stamps = parseInt(e.target.value);
+        });
+        row.querySelector('.reward-desc-input').addEventListener('input', (e) => {
+            tempRewards[idx].description = e.target.value;
+        });
+        row.querySelector('.reward-row-delete-btn').addEventListener('click', () => {
+            tempRewards.splice(idx, 1);
+            renderRewardsList();
+        });
+
+        list.appendChild(row);
+    });
+}
+
+function addRewardRow() {
+    const defaultStamp = Math.min(tempTotalStamps, tempRewards.length > 0
+        ? Math.max(...tempRewards.map(r => r.stamps)) + 1
+        : Math.ceil(tempTotalStamps / 2));
+    const clampedStamp = Math.min(defaultStamp, tempTotalStamps);
+    tempRewards.push({ stamps: clampedStamp, description: '' });
+    renderRewardsList();
+}
+
+async function handleSaveRewardSettings(e) {
+    e.preventDefault();
+    const submitBtn = document.getElementById('saveRewardSettingsBtn');
+    const feedback = document.getElementById('rewardSettingsFeedback');
+
+    // Validate rewards
+    for (const r of tempRewards) {
+        if (!r.description.trim()) {
+            if (feedback) {
+                feedback.textContent = 'Todos los premios deben tener una descripción.';
+                feedback.className = 'settings-feedback error';
+            }
+            return;
+        }
+        if (r.stamps < 1 || r.stamps > tempTotalStamps) {
+            if (feedback) {
+                feedback.textContent = `El sello de cada premio debe ser entre 1 y ${tempTotalStamps}.`;
+                feedback.className = 'settings-feedback error';
+            }
+            return;
+        }
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        const textSpan = submitBtn.querySelector('.btn-text');
+        if (textSpan) textSpan.textContent = 'Guardando...';
+    }
+
+    try {
+        await saveRewardSettings({
+            totalStamps: tempTotalStamps,
+            rewards: tempRewards
+        });
+
+        currentTotalStamps = tempTotalStamps;
+        TOTAL_STAMPS = currentTotalStamps;
+        currentRewards = tempRewards.map(r => ({ ...r }));
+
+        updateRewardConfigPill();
+
+        if (feedback) {
+            feedback.textContent = '✓ ¡Premios guardados exitosamente!';
+            feedback.className = 'settings-feedback success';
+        }
+
+        // Re-render the active card with the new config
+        if (selectedCardId) renderActiveSellerCard();
+
+        setTimeout(() => closeRewardSettingsModal(), 650);
+
+    } catch (err) {
+        console.error('Error guardando premios:', err);
+        if (feedback) {
+            feedback.textContent = 'Error al guardar. Revisa la conexión.';
+            feedback.className = 'settings-feedback error';
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            const textSpan = submitBtn.querySelector('.btn-text');
+            if (textSpan) textSpan.textContent = 'Guardar Premios';
+        }
+    }
+}

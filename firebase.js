@@ -81,11 +81,13 @@ function subscribeToClientCards(clientEmail, callback) {
 /**
  * Add a client card for a seller
  */
-async function addClientCard({ sellerId, sellerName, businessName, cardColor, clientEmail, clientName }) {
+async function addClientCard({ sellerId, sellerName, businessName, cardColor, totalStamps, rewards, clientEmail, clientName }) {
     if (!sellerId || !clientEmail) {
         throw new Error('sellerId y clientEmail son requeridos');
     }
     const cleanEmail = clientEmail.toLowerCase().trim();
+    const cardTotalStamps = totalStamps || 10;
+    const cardRewards = rewards || [{ stamps: cardTotalStamps, description: 'Premio especial' }];
 
     try {
         // 1. Check if this seller already created a card for this client email
@@ -135,10 +137,12 @@ async function addClientCard({ sellerId, sellerName, businessName, cardColor, cl
             sellerName: sellerName || 'Vendedor',
             businessName: businessName || 'Mi Negocio',
             cardColor: cardColor || '#ff6f4a',
+            totalStamps: cardTotalStamps,
+            rewards: cardRewards,
             clientId: clientId,
             clientEmail: cleanEmail,
             clientName: finalClientName,
-            stamps: new Array(10).fill(false),
+            stamps: new Array(cardTotalStamps).fill(false),
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -223,6 +227,76 @@ async function saveCardSettings(settings) {
         console.error('Error guardando configuración de vendedor:', error);
         throw error;
     }
+}
+
+/**
+ * Save reward settings (totalStamps + rewards list) to seller profile
+ * and propagate totalStamps to all existing client cards
+ */
+async function saveRewardSettings(settings) {
+    try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        const { totalStamps, rewards } = settings;
+
+        // Update seller profile
+        await db.collection('users').doc(currentUser.uid).set({
+            totalStamps: totalStamps,
+            rewards: rewards,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        // Propagate to all client cards (resize stamps array if needed)
+        const cardsSnap = await db.collection('cards')
+            .where('sellerId', '==', currentUser.uid)
+            .get();
+
+        if (!cardsSnap.empty) {
+            const batch = db.batch();
+            cardsSnap.forEach(doc => {
+                const cardData = doc.data();
+                const oldStamps = cardData.stamps || [];
+                // Resize stamps array preserving existing stamps
+                const newStamps = Array.from({ length: totalStamps }, (_, i) => !!oldStamps[i]);
+                batch.set(doc.ref, {
+                    totalStamps: totalStamps,
+                    rewards: rewards,
+                    stamps: newStamps,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            });
+            await batch.commit();
+        }
+    } catch (error) {
+        console.error('Error guardando configuración de premios:', error);
+        throw error;
+    }
+}
+
+/**
+ * Load reward settings for the current seller
+ */
+async function loadRewardSettings() {
+    try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+            const userDoc = await db.collection('users').doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                const data = userDoc.data();
+                return {
+                    totalStamps: data.totalStamps || 10,
+                    rewards: data.rewards || [{ stamps: data.totalStamps || 10, description: 'Premio especial' }]
+                };
+            }
+        }
+    } catch (error) {
+        console.error('Error cargando configuración de premios:', error);
+    }
+    return {
+        totalStamps: 10,
+        rewards: [{ stamps: 10, description: 'Premio especial' }]
+    };
 }
 
 /**
