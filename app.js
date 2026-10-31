@@ -23,6 +23,7 @@ let clientCardsUnsubscribe = null;
 let currentBusinessName = '';
 let currentCardColor = '#ff6f4a';
 let tempSelectedColor = '#ff6f4a';
+let currentOverlayRewardId = null;
 
 const COLOR_PRESETS = [
     { name: 'Coral Clásico', hex: '#ff6f4a' },
@@ -168,12 +169,14 @@ async function initSeller(profile) {
         const emptyEl = document.getElementById('sellerEmptyClients');
         const stampCardEl = document.getElementById('stampCard');
         const activeStrip = document.getElementById('activeClientStrip');
+        const rewardsPanel = document.getElementById('sellerRewardsPanel');
 
         if (sellerCards.length === 0) {
             selectedCardId = null;
             if (emptyEl) emptyEl.style.display = 'block';
             if (stampCardEl) stampCardEl.style.display = 'none';
             if (activeStrip) activeStrip.style.display = 'none';
+            if (rewardsPanel) rewardsPanel.style.display = 'none';
         } else {
             if (emptyEl) emptyEl.style.display = 'none';
             if (stampCardEl) stampCardEl.style.display = 'block';
@@ -385,12 +388,17 @@ function renderActiveSellerCard() {
     renderSellerGrid(card.stamps || new Array(cardTotal).fill(false), cardTotal, rewards);
     updateSellerProgress(stampsCount, cardTotal);
 
+    // Render customer rewards panel for seller
+    renderSellerClientRewards(card);
+
     // Check reward milestones
     const hitReward = rewards.find(r => r.stamps === stampsCount);
     if (hitReward) {
         const overlay = document.getElementById('rewardOverlay');
         if (overlay && !overlay.classList.contains('visible') && !overlay.dataset.dismissed) {
-            showRewardOverlay(displayName, hitReward.description);
+            const earned = getEffectiveEarnedRewards(card);
+            const matchingReward = earned.find(e => e.stampMilestone === hitReward.stamps && e.status === 'pending');
+            showRewardOverlay(displayName, hitReward.description, matchingReward ? matchingReward.id : null);
         }
     }
 }
@@ -433,21 +441,55 @@ async function toggleStamp(index) {
     const cardTotal = getCardTotalStamps(card);
     const rewards = getCardRewards(card);
     const currentStamps = [...(card.stamps || new Array(cardTotal).fill(false))];
-    currentStamps[index] = !currentStamps[index];
+    const willBeStamped = !currentStamps[index];
+    currentStamps[index] = willBeStamped;
+
+    const count = currentStamps.filter(Boolean).length;
+    let earnedRewards = getEffectiveEarnedRewards(card);
+    let newlyEarnedReward = null;
+
+    // Check all rewards milestones reached
+    rewards.forEach(r => {
+        if (count >= r.stamps) {
+            const alreadyExists = earnedRewards.some(er => er.stampMilestone === r.stamps);
+            if (!alreadyExists) {
+                const newEntry = {
+                    id: 'rew_' + Date.now() + '_' + r.stamps + '_' + Math.random().toString(36).substr(2, 4),
+                    stampMilestone: r.stamps,
+                    description: r.description,
+                    status: 'pending',
+                    earnedAt: new Date().toISOString(),
+                    claimedAt: null
+                };
+                earnedRewards.push(newEntry);
+                if (count === r.stamps) {
+                    newlyEarnedReward = newEntry;
+                }
+            }
+        }
+    });
+
+    // If unchecking a stamp and count dropped below milestone,
+    // remove pending reward for that milestone if not yet claimed
+    if (!willBeStamped) {
+        earnedRewards = earnedRewards.filter(er => {
+            if (er.status === 'claimed') return true;
+            return count >= er.stampMilestone;
+        });
+    }
 
     // Optimistic local update
     card.stamps = currentStamps;
+    card.earnedRewards = earnedRewards;
     renderActiveSellerCard();
 
-    const count = currentStamps.filter(Boolean).length;
-    const hitReward = rewards.find(r => r.stamps === count);
-    if (hitReward) {
-        showRewardOverlay(card.clientName, hitReward.description);
+    if (newlyEarnedReward) {
+        showRewardOverlay(card.clientName, newlyEarnedReward.description, newlyEarnedReward.id);
     }
 
     // Persist to Firestore
     try {
-        await saveCardStamps(card.id, currentStamps);
+        await saveCardStamps(card.id, currentStamps, earnedRewards);
     } catch (err) {
         console.error('Error al guardar sello:', err);
     }
@@ -480,17 +522,18 @@ function updateSellerProgress(count, cardTotal) {
     }
 }
 
-function showRewardOverlay(clientName, rewardDescription) {
+function showRewardOverlay(clientName, rewardDescription, rewardId) {
+    currentOverlayRewardId = rewardId || null;
     const overlay = document.getElementById('rewardOverlay');
     const subtitle = document.getElementById('rewardSubtitle');
     const rewardBadgeText = document.getElementById('rewardBadgeText');
     if (!overlay) return;
 
     if (subtitle && clientName) {
-        subtitle.textContent = `${clientName} ha completado un hito de sellos`;
+        subtitle.textContent = `${clientName} ha desbloqueado una recompensa`;
     }
     if (rewardBadgeText) {
-        rewardBadgeText.textContent = rewardDescription || 'Dile a tu cliente que ganó su recompensa';
+        rewardBadgeText.textContent = rewardDescription || 'Premio especial';
     }
 
     delete overlay.dataset.dismissed;
@@ -498,17 +541,24 @@ function showRewardOverlay(clientName, rewardDescription) {
     launchConfetti();
 }
 
-async function claimReward() {
+async function handleClaimFromModal() {
     const card = getActiveSellerCard();
     if (!card) return closeReward();
 
-    const cardTotal = getCardTotalStamps(card);
-    const emptyStamps = new Array(cardTotal).fill(false);
-    card.stamps = emptyStamps;
-    await saveCardStamps(card.id, emptyStamps);
-
+    if (currentOverlayRewardId) {
+        await handleSellerMarkClaimed(currentOverlayRewardId);
+    } else {
+        const earned = getEffectiveEarnedRewards(card);
+        const pending = earned.find(r => r.status === 'pending');
+        if (pending) {
+            await handleSellerMarkClaimed(pending.id);
+        }
+    }
     closeReward();
-    renderActiveSellerCard();
+}
+
+function claimReward() {
+    return handleClaimFromModal();
 }
 
 function closeReward() {
@@ -519,25 +569,224 @@ function closeReward() {
     }
 }
 
+function getEffectiveEarnedRewards(card) {
+    if (!card) return [];
+    let earned = Array.isArray(card.earnedRewards) ? [...card.earnedRewards] : [];
+    const rewards = getCardRewards(card);
+    const count = (card.stamps || []).filter(Boolean).length;
+
+    // Backward compatibility for existing cards that reached milestones before this feature
+    if (earned.length === 0 && count > 0) {
+        rewards.forEach(r => {
+            if (count >= r.stamps) {
+                earned.push({
+                    id: `rew_leg_${r.stamps}_${card.id ? card.id.substr(0, 6) : 'init'}`,
+                    stampMilestone: r.stamps,
+                    description: r.description,
+                    status: 'pending',
+                    earnedAt: new Date().toISOString(),
+                    claimedAt: null
+                });
+            }
+        });
+    }
+    return earned;
+}
+
+function renderSellerClientRewards(card) {
+    const panel = document.getElementById('sellerRewardsPanel');
+    const badge = document.getElementById('sellerRewardsCounterBadge');
+    const alertBox = document.getElementById('sellerRewardsAlertBox');
+    const list = document.getElementById('sellerRewardsList');
+    const resetBtn = document.getElementById('resetClientCardBtn');
+    const resetBtnLabel = document.getElementById('resetCardBtnLabel');
+    if (!panel || !card) return;
+
+    panel.style.display = 'flex';
+
+    const earnedRewards = getEffectiveEarnedRewards(card);
+    const pendingRewards = earnedRewards.filter(r => r.status === 'pending');
+    const pendingCount = pendingRewards.length;
+
+    if (badge) {
+        badge.textContent = `${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+        badge.classList.toggle('has-pending', pendingCount > 0);
+    }
+
+    if (alertBox) {
+        alertBox.style.display = pendingCount > 0 ? 'flex' : 'none';
+    }
+
+    if (resetBtn) {
+        if (pendingCount > 0) {
+            resetBtn.classList.add('has-pending-rewards');
+            resetBtn.title = `El cliente tiene ${pendingCount} recompensa(s) pendiente(s) por reclamar antes de poder iniciar una nueva tarjeta.`;
+            if (resetBtnLabel) resetBtnLabel.textContent = `Nueva Tarjeta (${pendingCount} pend.)`;
+        } else {
+            resetBtn.classList.remove('has-pending-rewards');
+            resetBtn.title = 'Iniciar nueva tarjeta de sellos para este cliente';
+            if (resetBtnLabel) resetBtnLabel.textContent = 'Nueva Tarjeta';
+        }
+    }
+
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (earnedRewards.length === 0) {
+        list.innerHTML = `
+            <div class="seller-rewards-empty">
+                <span>🎁 Este cliente aún no tiene recompensas acumuladas. Se desbloquearán al sumar sellos.</span>
+            </div>
+        `;
+        return;
+    }
+
+    // Sort: pending first, then by milestone descending
+    const sorted = [...earnedRewards].sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        return (b.stampMilestone || 0) - (a.stampMilestone || 0);
+    });
+
+    sorted.forEach(r => {
+        const isClaimed = r.status === 'claimed';
+        const item = document.createElement('div');
+        item.className = `seller-reward-item ${isClaimed ? 'claimed' : 'pending'}`;
+
+        const dateStr = r.claimedAt 
+            ? `Reclamada: ${new Date(r.claimedAt).toLocaleDateString()}`
+            : (r.earnedAt ? `Desbloqueada: ${new Date(r.earnedAt).toLocaleDateString()}` : '');
+
+        item.innerHTML = `
+            <div class="seller-reward-item-left">
+                <span class="seller-reward-icon">🎁</span>
+                <div class="seller-reward-item-info">
+                    <div class="seller-reward-title-row">
+                        <span class="seller-reward-desc">${escapeHtml(r.description)}</span>
+                        <span class="seller-reward-milestone">Sello ${r.stampMilestone}</span>
+                    </div>
+                    <div class="seller-reward-meta">
+                        <span class="seller-reward-status-pill ${r.status}">
+                            ${isClaimed ? '✓ Reclamada' : '⏳ Pendiente'}
+                        </span>
+                        ${dateStr ? `<span class="seller-reward-date">${dateStr}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="seller-reward-item-actions">
+                ${!isClaimed ? `
+                    <button class="seller-claim-btn" onclick="handleSellerMarkClaimed('${r.id}')" title="Marcar como entregada al cliente">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span>Marcar Reclamada</span>
+                    </button>
+                ` : `
+                    <div class="seller-claimed-group">
+                        <span class="seller-claimed-badge">
+                            ✓ Entregada
+                        </span>
+                        <button class="seller-unclaim-btn" onclick="handleSellerUnmarkClaimed('${r.id}')" title="Anular entrega y volver a marcar como pendiente">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            <span>Anular entrega</span>
+                        </button>
+                    </div>
+                `}
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+async function handleSellerMarkClaimed(rewardId) {
+    const card = getActiveSellerCard();
+    if (!card || !rewardId) return;
+
+    let earned = getEffectiveEarnedRewards(card);
+    const target = earned.find(r => r.id === rewardId);
+    if (!target) return;
+
+    target.status = 'claimed';
+    target.claimedAt = new Date().toISOString();
+    card.earnedRewards = earned;
+
+    renderActiveSellerCard();
+
+    try {
+        await markCardRewardClaimed(card.id, rewardId);
+    } catch (err) {
+        console.error('Error al marcar recompensa:', err);
+        alert('Hubo un error al actualizar la recompensa');
+    }
+}
+
+async function handleSellerUnmarkClaimed(rewardId) {
+    const card = getActiveSellerCard();
+    if (!card || !rewardId) return;
+
+    let earned = getEffectiveEarnedRewards(card);
+    const target = earned.find(r => r.id === rewardId);
+    if (!target) return;
+
+    target.status = 'pending';
+    target.claimedAt = null;
+    card.earnedRewards = earned;
+
+    renderActiveSellerCard();
+
+    try {
+        await unmarkCardRewardClaimed(card.id, rewardId);
+    } catch (err) {
+        console.error('Error al anular reclamo de recompensa:', err);
+        alert('Hubo un error al anular la entrega');
+    }
+}
+
 async function handleResetClientCard() {
     const card = getActiveSellerCard();
     if (!card) return;
 
-    if (!confirm(`¿Deseas reiniciar los sellos de ${card.clientName || card.clientEmail} a 0?`)) {
+    const earned = getEffectiveEarnedRewards(card);
+    const pending = earned.filter(r => r.status === 'pending');
+
+    // RULE: All rewards must be claimed before obtaining a new card!
+    if (pending.length > 0) {
+        alert(
+            `⚠️ ATENCIÓN: El cliente tiene ${pending.length} recompensa(s) PENDIENTE(S) por reclamar:\n\n` +
+            pending.map(p => `• ${p.description} (Sello ${p.stampMilestone})`).join('\n') +
+            `\n\nDebes marcarlas como "Reclamadas" antes de poder entregarle o iniciar una nueva tarjeta.`
+        );
+        const panel = document.getElementById('sellerRewardsPanel');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+    }
+
+    const clientName = card.clientName || card.clientEmail || 'el cliente';
+    if (!confirm(`¿Deseas iniciar una nueva tarjeta de sellos para ${clientName}?\n\nTodas las recompensas de la tarjeta actual ya han sido reclamadas. Los sellos volverán a 0 para comenzar un nuevo ciclo.`)) {
         return;
     }
 
     const cardTotal = getCardTotalStamps(card);
+
+    // Optimistic update
+    const emptyStamps = new Array(cardTotal).fill(false);
+    card.stamps = emptyStamps;
+    card.earnedRewards = [];
+    renderActiveSellerCard();
+
     try {
-        const emptyStamps = new Array(cardTotal).fill(false);
-        await db.collection('cards').doc(card.id).set({
-            stamps: emptyStamps,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        card.stamps = emptyStamps;
-        renderActiveSellerCard();
+        const res = await startNewCardCycle(card.id, cardTotal);
+        if (res && !res.success) {
+            alert(res.message || 'No se pudo reiniciar la tarjeta');
+        }
     } catch (err) {
-        alert('Error al reiniciar sellos');
+        console.error('Error al reiniciar tarjeta:', err);
+        alert('Error al iniciar nueva tarjeta');
     }
 }
 
@@ -784,9 +1033,6 @@ function renderActiveClientCard() {
     const textEl = document.getElementById('clientProgressText');
     const summaryCard = document.getElementById('clientSummary');
     const summaryTitle = document.getElementById('clientSummaryTitle');
-    const rewardBanner = document.getElementById('clientRewardBanner');
-    const rewardBannerText = document.getElementById('clientRewardBannerText');
-
     if (titleEl) titleEl.textContent = businessName;
     if (subtitleEl) subtitleEl.textContent = `Tu progreso en ${businessName}`;
 
@@ -810,13 +1056,73 @@ function renderActiveClientCard() {
         }
     }
 
-    // Show reward description if applicable
-    const hitReward = rewards.find(r => r.stamps === count);
+    // Render accumulated rewards banner
+    const rewardBanner = document.getElementById('clientRewardBanner');
+    const rewardsListEl = document.getElementById('clientRewardsAccumulatedList');
+    const countBadge = document.getElementById('clientRewardCountBadge');
+    const earnedRewards = getEffectiveEarnedRewards(card);
+    const pendingCount = earnedRewards.filter(r => r.status === 'pending').length;
+
     if (rewardBanner) {
-        rewardBanner.classList.toggle('visible', isComplete || !!hitReward);
-    }
-    if (rewardBannerText && (isComplete || hitReward)) {
-        rewardBannerText.textContent = hitReward ? hitReward.description : (rewards[rewards.length - 1]?.description || 'Reclama tu recompensa con el vendedor');
+        const hasRewards = earnedRewards.length > 0;
+        rewardBanner.classList.toggle('visible', hasRewards || isComplete);
+
+        if (countBadge) {
+            countBadge.textContent = `${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+            countBadge.style.display = earnedRewards.length > 0 ? 'inline-block' : 'none';
+        }
+
+        if (rewardsListEl) {
+            rewardsListEl.innerHTML = '';
+            if (earnedRewards.length === 0) {
+                rewardsListEl.innerHTML = `
+                    <div class="client-reward-card pending">
+                        <div class="client-reward-card-top-row">
+                            <span class="client-reward-card-badge">RECOMPENSA FINAL</span>
+                            <span class="client-reward-card-milestone">${cardTotal} sellos</span>
+                        </div>
+                        <div class="client-reward-card-body">
+                            <div class="client-reward-card-icon">🎁</div>
+                            <div class="client-reward-card-info">
+                                <h4 class="client-reward-card-title">${escapeHtml(rewards[rewards.length - 1]?.description || 'Premio especial')}</h4>
+                                <p class="client-reward-card-detail">¡Completa tu tarjeta para reclamar!</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                earnedRewards.forEach(r => {
+                    const isClaimed = r.status === 'claimed';
+                    const cardItem = document.createElement('div');
+                    cardItem.className = `client-reward-card ${isClaimed ? 'claimed' : 'pending'}`;
+                    cardItem.innerHTML = `
+                        <div class="client-reward-card-top-row">
+                            <span class="client-reward-card-badge">${isClaimed ? '✓ RECLAMADA' : 'DISPONIBLE PARA CANJE'}</span>
+                            <span class="client-reward-card-milestone">Sello ${r.stampMilestone}</span>
+                        </div>
+                        <div class="client-reward-card-body">
+                            <div class="client-reward-card-icon">🎁</div>
+                            <div class="client-reward-card-info">
+                                <h4 class="client-reward-card-title">${escapeHtml(r.description)}</h4>
+                                <p class="client-reward-card-detail">Desbloqueado al alcanzar ${r.stampMilestone} sellos</p>
+                            </div>
+                        </div>
+                        <div class="client-reward-card-status">
+                            ${isClaimed ? `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                <span>Entregada por el encargado</span>
+                            ` : `
+                                <span class="pulse-dot"></span>
+                                <span>Pendiente de entrega — ¡Pídelo al encargado!</span>
+                            `}
+                        </div>
+                    `;
+                    rewardsListEl.appendChild(cardItem);
+                });
+            }
+        }
     }
 
     // Render read-only stamps grid

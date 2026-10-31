@@ -23,18 +23,22 @@ const auth = firebase.auth();
 // ===================================
 
 /**
- * Save stamps array for a specific card document
+ * Save stamps array and earned rewards for a specific card document
  */
-async function saveCardStamps(cardId, stampsArray) {
+async function saveCardStamps(cardId, stampsArray, earnedRewards) {
     if (!cardId) {
         console.error('saveCardStamps: Falta cardId');
         return;
     }
     try {
-        await db.collection('cards').doc(cardId).set({
+        const updateData = {
             stamps: stampsArray,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+        if (earnedRewards !== undefined) {
+            updateData.earnedRewards = earnedRewards;
+        }
+        await db.collection('cards').doc(cardId).set(updateData, { merge: true });
     } catch (error) {
         console.error('Error guardando sellos de la tarjeta:', error);
         throw error;
@@ -143,6 +147,9 @@ async function addClientCard({ sellerId, sellerName, businessName, cardColor, to
             clientEmail: cleanEmail,
             clientName: finalClientName,
             stamps: new Array(cardTotalStamps).fill(false),
+            earnedRewards: [],
+            claimedHistory: [],
+            cardCycle: 1,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -174,19 +181,143 @@ async function deleteClientCard(cardId) {
 }
 
 /**
- * Reset client stamps
+ * Mark a specific reward as claimed for a card
  */
-async function resetClientCard(cardId) {
-    if (!cardId) return;
+async function markCardRewardClaimed(cardId, rewardId) {
+    if (!cardId || !rewardId) return;
     try {
-        await db.collection('cards').doc(cardId).set({
-            stamps: new Array(10).fill(false),
+        const cardRef = db.collection('cards').doc(cardId);
+        const doc = await cardRef.get();
+        if (!doc.exists) return;
+
+        const data = doc.data();
+        const earned = (data.earnedRewards || []).map(r => {
+            if (r.id === rewardId) {
+                return {
+                    ...r,
+                    status: 'claimed',
+                    claimedAt: new Date().toISOString()
+                };
+            }
+            return r;
+        });
+
+        await cardRef.set({
+            earnedRewards: earned,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        return { success: true };
     } catch (error) {
-        console.error('Error reiniciando sellos:', error);
+        console.error('Error marcando recompensa como reclamada:', error);
         throw error;
     }
+}
+
+/**
+ * Unmark a specific reward (revert claimed -> pending)
+ */
+async function unmarkCardRewardClaimed(cardId, rewardId) {
+    if (!cardId || !rewardId) return;
+    try {
+        const cardRef = db.collection('cards').doc(cardId);
+        const doc = await cardRef.get();
+        if (!doc.exists) return;
+
+        const data = doc.data();
+        const earned = (data.earnedRewards || []).map(r => {
+            if (r.id === rewardId) {
+                return {
+                    ...r,
+                    status: 'pending',
+                    claimedAt: null
+                };
+            }
+            return r;
+        });
+
+        await cardRef.set({
+            earnedRewards: earned,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        console.error('Error anulando reclamo de recompensa:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a specific reward from a card
+ */
+async function deleteCardReward(cardId, rewardId) {
+    if (!cardId || !rewardId) return;
+    try {
+        const cardRef = db.collection('cards').doc(cardId);
+        const doc = await cardRef.get();
+        if (!doc.exists) return;
+
+        const data = doc.data();
+        const earned = (data.earnedRewards || []).filter(r => r.id !== rewardId);
+
+        await cardRef.set({
+            earnedRewards: earned,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        console.error('Error eliminando recompensa:', error);
+        throw error;
+    }
+}
+
+/**
+ * Start a new card cycle (reset stamps)
+ * SAFETY: Only allowed if all rewards are claimed (0 pending rewards)
+ */
+async function startNewCardCycle(cardId, totalStamps) {
+    if (!cardId) return { success: false, message: 'Falta cardId' };
+    try {
+        const cardRef = db.collection('cards').doc(cardId);
+        const doc = await cardRef.get();
+        if (!doc.exists) return { success: false, message: 'Tarjeta no encontrada' };
+
+        const data = doc.data();
+        const currentRewards = data.earnedRewards || [];
+        const pendingRewards = currentRewards.filter(r => r.status === 'pending');
+
+        if (pendingRewards.length > 0) {
+            return {
+                success: false,
+                code: 'PENDING_REWARDS',
+                message: `El cliente tiene ${pendingRewards.length} recompensa(s) pendiente(s) por reclamar.`,
+                pendingRewards: pendingRewards
+            };
+        }
+
+        const claimedRewards = currentRewards.filter(r => r.status === 'claimed');
+        const history = [...(data.claimedHistory || []), ...claimedRewards];
+        const cardTotal = totalStamps || data.totalStamps || 10;
+
+        await cardRef.set({
+            stamps: new Array(cardTotal).fill(false),
+            earnedRewards: [],
+            claimedHistory: history,
+            cardCycle: (data.cardCycle || 1) + 1,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error iniciando nueva tarjeta:', error);
+        throw error;
+    }
+}
+
+/**
+ * Legacy reset stamps (delegates to startNewCardCycle with validation)
+ */
+async function resetClientCard(cardId, totalStamps) {
+    return startNewCardCycle(cardId, totalStamps);
 }
 
 /**

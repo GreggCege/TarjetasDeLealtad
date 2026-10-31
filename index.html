@@ -323,12 +323,12 @@
                         </div>
                     </div>
                     <div class="active-client-actions">
-                        <button class="client-action-btn" onclick="handleResetClientCard()" title="Reiniciar sellos a 0">
+                        <button class="client-action-btn" id="resetClientCardBtn" onclick="handleResetClientCard()" title="Iniciar nueva tarjeta (solo si no hay recompensas pendientes)">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                                 <path d="M3 3v5h5"/>
                             </svg>
-                            <span>Reiniciar</span>
+                            <span id="resetCardBtnLabel">Nueva Tarjeta</span>
                         </button>
                         <button class="client-action-btn delete" onclick="handleDeleteClientCard()" title="Eliminar cliente de mi lista">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -410,6 +410,43 @@
                     </div>
                 </div>
 
+                <!-- Seller Client Rewards Panel -->
+                <div class="seller-rewards-panel" id="sellerRewardsPanel" style="display: none;">
+                    <div class="seller-rewards-header">
+                        <div class="seller-rewards-title-area">
+                            <div class="seller-rewards-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                                    <path d="M20 12V22H4V12"/>
+                                    <path d="M22 7H2v5h20V7z"/>
+                                    <path d="M12 22V7"/>
+                                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="seller-rewards-title">Recompensas de este Cliente</h3>
+                                <p class="seller-rewards-subtitle" id="sellerRewardsSubtitle">Gestiona los premios acumulados de este cliente</p>
+                            </div>
+                        </div>
+                        <span class="seller-rewards-counter-badge" id="sellerRewardsCounterBadge">0 pendientes</span>
+                    </div>
+
+                    <!-- Alert message when client has pending rewards blocking new card -->
+                    <div class="seller-rewards-alert-box" id="sellerRewardsAlertBox" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>El cliente debe reclamar todas sus recompensas antes de poder iniciar una nueva tarjeta.</span>
+                    </div>
+
+                    <!-- List of client rewards -->
+                    <div class="seller-rewards-list" id="sellerRewardsList">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
                 <!-- Reward Modal (hidden by default) -->
                 <div class="reward-overlay" id="rewardOverlay">
                     <div class="reward-modal" id="rewardModal">
@@ -418,24 +455,24 @@
                             <div class="reward-icon-wrapper">
                                 <div class="reward-icon">🎉</div>
                             </div>
-                            <h2 class="reward-title">¡Tarjeta Completa!</h2>
-                            <p class="reward-subtitle" id="rewardSubtitle">Tu cliente ha completado sus 10 sellos</p>
+                            <h2 class="reward-title" id="rewardModalTitle">¡Recompensa Desbloqueada!</h2>
+                            <p class="reward-subtitle" id="rewardSubtitle">Tu cliente ha alcanzado un premio</p>
                             <div class="reward-badge">
                                 <span class="reward-badge-icon">🎁</span>
-                                <span class="reward-badge-text" id="rewardBadgeText">Dile a tu cliente que ganó su recompensa</span>
+                                <span class="reward-badge-text" id="rewardBadgeText">Premio especial</span>
                             </div>
-                            <p class="reward-description">El cliente ha completado su tarjeta. Entrégale su premio y
-                                reinicia la tarjeta para comenzar de nuevo.
+                            <p class="reward-description" id="rewardModalDesc">
+                                Esta recompensa ya se acumuló en el panel del cliente. Puedes entregársela ahora o canjearla después. Recuerda que debe reclamarse antes de iniciar una nueva tarjeta.
                             </p>
                             <div class="reward-actions">
-                                <button class="reward-claim-btn" onclick="claimReward()">
-                                    <span>Premio Entregado — Reiniciar Tarjeta</span>
+                                <button class="reward-claim-btn" id="rewardModalClaimBtn" onclick="handleClaimFromModal()">
+                                    <span>Entregar y Marcar Reclamada</span>
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                                         stroke-linecap="round" width="20" height="20">
-                                        <path d="M5 12h14M12 5l7 7-7 7" />
+                                        <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </button>
-                                <button class="reward-close-btn" onclick="closeReward()">Cerrar sin reiniciar</button>
+                                <button class="reward-close-btn" onclick="closeReward()">Cerrar (Reclamar después)</button>
                             </div>
                         </div>
                     </div>
@@ -541,12 +578,32 @@
                         </div>
                     </div>
 
-                    <!-- Client Reward Message (shown when card is complete) -->
+                    <!-- Client Reward Message (Accumulated Rewards Banner) -->
                     <div class="client-reward-banner" id="clientRewardBanner">
-                        <div class="client-reward-banner-icon">🎉</div>
-                        <h3 class="client-reward-banner-title">¡Felicidades!</h3>
-                        <p class="client-reward-banner-text" id="clientRewardBannerText">Has completado tu tarjeta. Acude con el vendedor para reclamar
-                            tu recompensa.</p>
+                        <div class="client-reward-banner-header">
+                            <div class="client-reward-banner-icon">🎁</div>
+                            <div class="client-reward-banner-title-area">
+                                <h3 class="client-reward-banner-title" id="clientRewardBannerTitle">Tus Recompensas Acumuladas</h3>
+                                <p class="client-reward-banner-subtitle" id="clientRewardBannerSubtitle">
+                                    Muestra esta pantalla al encargado para canjear tus premios
+                                </p>
+                            </div>
+                            <span class="client-reward-count-badge" id="clientRewardCountBadge">0 pendientes</span>
+                        </div>
+
+                        <!-- Accumulated rewards list -->
+                        <div class="client-rewards-accumulated-list" id="clientRewardsAccumulatedList">
+                            <!-- Rendered by JS -->
+                        </div>
+
+                        <div class="client-reward-banner-footer" id="clientRewardBannerFooter">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            <span>Debes reclamar tus recompensas pendientes con el vendedor antes de que se inicie una nueva tarjeta de sellos.</span>
+                        </div>
                     </div>
                 </div>
             </main>
